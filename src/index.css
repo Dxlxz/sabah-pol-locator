@@ -1,0 +1,101 @@
+@import "leaflet/dist/leaflet.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Leaflet map container - fill parent */
+.leaflet-container {
+  height: 100% !important;
+  width: 100% !important;
+  background: #e5e7eb;
+}
+
+/* Custom marker - transparent wrapper */
+.custom-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Marker circle with fuel icon */
+.custom-marker {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s;
+  cursor: pointer;
+}
+
+.custom-marker:hover {
+  transform: scale(1.15);
+}
+
+/* KodLokasi label above marker */
+.marker-label {
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  white-space: nowrap;
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* Leaflet popup overrides for clean styling */
+.leaflet-popup-content-wrapper {
+  border-radius: 14px;
+  padding: 0;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
+.leaflet-popup-content {
+  margin: 14px 16px;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.leaflet-popup-tip {
+  box-shadow: none;
+}
+
+/* Override Leaflet's default link styling inside popups */
+.leaflet-popup-content a {
+  color: inherit;
+}
+
+.leaflet-popup-content a.no-underline {
+  text-decoration: none;
+}
+
+.leaflet-popup-content a.no-underline:hover {
+  text-decoration: none;
+}
