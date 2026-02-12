@@ -7,8 +7,8 @@ import {
 } from 'lucide-react';
 import type { Station } from '../data/stations';
 import {
-    submitReceipt, compressImage,
-    type ReceiptResponse,
+    submitReceipt, compressImage, scanReceipt,
+    type ReceiptResponse, type ExtractedReceiptData,
 } from '../lib/api';
 import {
     addReceiptToHistory, getReceiptHistory,
@@ -31,6 +31,9 @@ interface Step1Props {
     vehicleReg: string;
     odometerCurrent: string;
     odometerPrevious: string;
+    scanState: 'idle' | 'scanning' | 'success' | 'error';
+    scanError: string | null;
+    extractedData: ExtractedReceiptData | null;
     isLoading: boolean;
     touchedFields: Set<string>;
     fileInputRef: React.RefObject<HTMLInputElement | null>;
@@ -46,9 +49,9 @@ interface Step1Props {
 
 function Step1Content({
     imagePreview, imageBase64, vehicleReg, odometerCurrent, odometerPrevious,
-    isLoading, touchedFields, fileInputRef, onImageClick, onRemoveImage,
-    onFileChange, onVehicleRegChange, onOdometerCurrentChange, onOdometerPreviousChange,
-    onMarkTouched, onNext
+    scanState, scanError, extractedData, isLoading, touchedFields, fileInputRef,
+    onImageClick, onRemoveImage, onFileChange, onVehicleRegChange,
+    onOdometerCurrentChange, onOdometerPreviousChange, onMarkTouched, onNext
 }: Step1Props) {
     const showError = (field: string, condition: boolean) => touchedFields.has(field) && condition;
     const step1Valid = imageBase64 != null && vehicleReg.trim().length > 0 && odometerCurrent.trim().length > 0;
@@ -89,6 +92,40 @@ function Step1Content({
                         </button>
                     </div>
                 )}
+
+                {/* AI Scan Status */}
+                {scanState === 'scanning' && (
+                    <div className="mt-3 p-3 bg-blue-50 border border-blue-200/60 rounded-lg">
+                        <div className="flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                            <span className="text-sm text-blue-700">AI scanning receipt...</span>
+                        </div>
+                    </div>
+                )}
+
+                {scanState === 'success' && extractedData && (
+                    <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200/60 rounded-lg">
+                        <div className="flex items-center gap-2 mb-1">
+                            <CheckCircle className="w-4 h-4 text-emerald-600" />
+                            <span className="text-sm font-medium text-emerald-700">Receipt scanned!</span>
+                        </div>
+                        <div className="text-xs text-emerald-600">
+                            {extractedData.litres && <span>{extractedData.litres}L </span>}
+                            {extractedData.amount && <span>RM{extractedData.amount} </span>}
+                            {extractedData.fuelType && <span>• {extractedData.fuelType}</span>}
+                        </div>
+                    </div>
+                )}
+
+                {scanState === 'error' && (
+                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200/60 rounded-lg">
+                        <div className="flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 text-amber-600" />
+                            <span className="text-sm text-amber-700">{scanError || 'Scan failed - fill manually'}</span>
+                        </div>
+                    </div>
+                )}
+
                 <input
                     ref={fileInputRef}
                     type="file"
@@ -553,6 +590,11 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
     const [receiptResult, setReceiptResult] = useState<ReceiptResponse | null>(null);
     const [duplicateWarning, setDuplicateWarning] = useState(false);
 
+    // --- AI Scan state ---
+    const [scanState, setScanState] = useState<'idle' | 'scanning' | 'success' | 'error'>('idle');
+    const [extractedData, setExtractedData] = useState<ExtractedReceiptData | null>(null);
+    const [scanError, setScanError] = useState<string | null>(null);
+
     // --- Auto-fill previous odometer when vehicle reg changes ---
     useEffect(() => {
         if (vehicleReg.trim().length >= 3) {
@@ -589,6 +631,8 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
             const base64 = await compressImage(file);
             setImageBase64(base64);
             markTouched('image');
+            // Auto-trigger AI scan after image is processed
+            handleScanReceipt(base64);
         } catch {
             setImagePreview(null);
             setImageBase64(null);
@@ -596,6 +640,37 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
             setPhase('error');
         }
     }, [markTouched]);
+
+    // AI Scan function
+    const handleScanReceipt = useCallback(async (imageBase64Data: string) => {
+        setScanState('scanning');
+        setScanError(null);
+        try {
+            const result = await scanReceipt({
+                image: imageBase64Data,
+                station: station.name,
+                kodLokasi: station.kodLokasi,
+                region: station.region,
+            });
+            
+            if (result.success && result.extractedData) {
+                setExtractedData(result.extractedData);
+                setScanState('success');
+                // Auto-fill form fields
+                if (result.extractedData.litres) setLitres(String(result.extractedData.litres));
+                if (result.extractedData.amount) setAmount(String(result.extractedData.amount));
+                if (result.extractedData.receiptNo) setReceiptNo(result.extractedData.receiptNo);
+                if (result.extractedData.dateOnReceipt) setDateOnReceipt(result.extractedData.dateOnReceipt);
+                if (result.extractedData.fuelType) setFuelType(result.extractedData.fuelType);
+            } else {
+                setScanState('error');
+                setScanError(result.message || 'Could not read receipt clearly');
+            }
+        } catch (err) {
+            setScanState('error');
+            setScanError(err instanceof Error ? err.message : 'AI scan failed');
+        }
+    }, [station]);
 
     const handleRemoveImage = useCallback(() => {
         setImagePreview(null);
@@ -897,6 +972,9 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                                         vehicleReg={vehicleReg}
                                         odometerCurrent={odometerCurrent}
                                         odometerPrevious={odometerPrevious}
+                                        scanState={scanState}
+                                        scanError={scanError}
+                                        extractedData={extractedData}
                                         isLoading={isLoading}
                                         touchedFields={touchedFields}
                                         fileInputRef={fileInputRef}

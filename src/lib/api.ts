@@ -1,6 +1,7 @@
 // n8n webhook API wrapper for POL Receipt submission (single-phase async with optional AI)
 
 const WEBHOOK_URL = 'https://n8n2.earthinfo.com.my/webhook/pol-receipt';
+const SCAN_WEBHOOK_URL = 'https://n8n2.earthinfo.com.my/webhook/pol-receipt-scan';
 
 // --- Manual entry data structure ---
 export interface ManualReceiptData {
@@ -43,6 +44,32 @@ export interface ReceiptResponse {
     imageUrl: string | null;
 }
 
+// --- Scan receipt types (for AI auto-fill) ---
+export interface ScanPayload {
+    image: string;              // base64 encoded JPEG
+    station: string;
+    kodLokasi: string;
+    region: string;
+}
+
+export interface ExtractedReceiptData {
+    receiptNo: string | null;
+    dateOnReceipt: string | null;
+    fuelType: string | null;
+    litres: number | null;
+    amount: number | null;
+    pricePerLitre: number | null;
+    vehicleReg: string | null;
+    rawText: string;
+}
+
+export interface ScanResponse {
+    success: boolean;
+    extractedData: ExtractedReceiptData | null;
+    confidence: 'high' | 'medium' | 'low' | 'invalid';
+    message: string;
+}
+
 // --- Submit receipt (upload image + save manual data + optional AI) ---
 export async function submitReceipt(payload: SubmitPayload): Promise<ReceiptResponse> {
     const response = await fetch(WEBHOOK_URL, {
@@ -61,6 +88,22 @@ export async function submitReceipt(payload: SubmitPayload): Promise<ReceiptResp
         throw new Error(data.message || 'Receipt submission failed');
     }
 
+    return data;
+}
+
+// --- Scan receipt with AI (for auto-fill) ---
+export async function scanReceipt(payload: ScanPayload): Promise<ScanResponse> {
+    const response = await fetch(SCAN_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data: ScanResponse = await response.json();
     return data;
 }
 
