@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Camera, X, Loader2, CheckCircle, AlertCircle, User, ExternalLink,
@@ -23,230 +23,40 @@ interface ReceiptCaptureProps {
     onClose: () => void;
 }
 
-export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
-    // --- Step state ---
-    const [currentStep, setCurrentStep] = useState<Step>(1);
-    const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
-    
-    // --- Image state ---
-    const [imagePreview, setImagePreview] = useState<string | null>(null);
-    const [imageBase64, setImageBase64] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const submitInFlight = useRef(false);
+// --- Step Components (defined outside main component to prevent remounting) ---
 
-    // --- Form state ---
-    const [vehicleReg, setVehicleReg] = useState('');
-    const [odometerCurrent, setOdometerCurrent] = useState('');
-    const [odometerPrevious, setOdometerPrevious] = useState('');
-    const [submittedBy, setSubmittedBy] = useState('');
-    const [enableAI, setEnableAI] = useState(true);
-    
-    // Receipt Details
-    const [receiptNo, setReceiptNo] = useState('');
-    const [dateOnReceipt, setDateOnReceipt] = useState(() => {
-        const today = new Date();
-        return today.toISOString().split('T')[0];
-    });
-    const [fuelType, setFuelType] = useState('Petrol');
-    const [litres, setLitres] = useState('');
-    const [amount, setAmount] = useState('');
+interface Step1Props {
+    imagePreview: string | null;
+    imageBase64: string | null;
+    vehicleReg: string;
+    odometerCurrent: string;
+    odometerPrevious: string;
+    isLoading: boolean;
+    touchedFields: Set<string>;
+    fileInputRef: React.RefObject<HTMLInputElement | null>;
+    onImageClick: () => void;
+    onRemoveImage: () => void;
+    onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onVehicleRegChange: (value: string) => void;
+    onOdometerCurrentChange: (value: string) => void;
+    onOdometerPreviousChange: (value: string) => void;
+    onMarkTouched: (field: string) => void;
+    onNext: () => void;
+}
 
-    // --- Phase & result state ---
-    const [phase, setPhase] = useState<Phase>('idle');
-    const [resultMessage, setResultMessage] = useState('');
-    const [receiptResult, setReceiptResult] = useState<ReceiptResponse | null>(null);
-    const [duplicateWarning, setDuplicateWarning] = useState(false);
-
-    // --- Auto-fill previous odometer when vehicle reg changes ---
-    useEffect(() => {
-        if (vehicleReg.trim().length >= 3) {
-            const prev = getLastOdometerForVehicle(vehicleReg);
-            if (prev != null) {
-                setOdometerPrevious(String(prev));
-            }
-        }
-    }, [vehicleReg]);
-
-    // --- Calculations ---
-    const odomCurrent = parseFloat(odometerCurrent) || null;
-    const odomPrevious = parseFloat(odometerPrevious) || null;
-    const litresNum = parseFloat(litres) || null;
-    const amountNum = parseFloat(amount) || null;
-
-    // Auto-calculate Price per Litre
-    const pricePerLitre = useMemo(() => {
-        if (amountNum != null && litresNum != null && litresNum > 0) {
-            return amountNum / litresNum;
-        }
-        return null;
-    }, [amountNum, litresNum]);
-
-    const distance = odomCurrent != null && odomPrevious != null && odomCurrent > odomPrevious
-        ? odomCurrent - odomPrevious
-        : null;
-
-    const fuelEfficiency = distance != null && litresNum != null && litresNum > 0
-        ? distance / litresNum
-        : null;
-
-    // --- Step validation ---
-    const step1Valid = imageBase64 != null && 
-                       vehicleReg.trim().length > 0 && 
-                       odometerCurrent.trim().length > 0;
-    
-    const step2Valid = litresNum != null && litresNum > 0 &&
-                       amountNum != null && amountNum > 0;
-
-    const canSubmit = step1Valid && step2Valid;
-
-    // --- Handlers ---
-    const markTouched = (field: string) => {
-        setTouchedFields(prev => new Set([...prev, field]));
-    };
-
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        const previewUrl = URL.createObjectURL(file);
-        setImagePreview(previewUrl);
-        try {
-            const base64 = await compressImage(file);
-            setImageBase64(base64);
-            markTouched('image');
-        } catch {
-            setImagePreview(null);
-            setImageBase64(null);
-            setResultMessage('Failed to process image. Try again.');
-            setPhase('error');
-        }
-    };
-
-    const handleNextStep = () => {
-        // Mark all step 1 fields as touched when moving to step 2
-        if (currentStep === 1) {
-            ['image', 'vehicleReg', 'odometerCurrent'].forEach(markTouched);
-            if (step1Valid) setCurrentStep(2);
-        } else if (currentStep === 2) {
-            ['litres', 'amount'].forEach(markTouched);
-            if (step2Valid) setCurrentStep(3);
-        }
-    };
-
-    const handlePrevStep = () => {
-        if (currentStep === 2) setCurrentStep(1);
-        else if (currentStep === 3) setCurrentStep(2);
-    };
-
-    const handleSubmit = async (bypassDuplicateCheck = false) => {
-        if (!imageBase64 || submitInFlight.current || !canSubmit) return;
-
-        // Duplicate check
-        if (!bypassDuplicateCheck) {
-            const recentDuplicate = getReceiptHistory().find(entry =>
-                entry.kodLokasi === station.kodLokasi &&
-                entry.response.status === 'Saved' &&
-                Date.now() - new Date(entry.timestamp).getTime() < 5 * 60 * 1000
-            );
-            if (recentDuplicate) {
-                setDuplicateWarning(true);
-                return;
-            }
-        }
-
-        setDuplicateWarning(false);
-        submitInFlight.current = true;
-        setPhase('submitting');
-        setResultMessage('');
-
-        try {
-            const result = await submitReceipt({
-                image: imageBase64,
-                station: station.name,
-                kodLokasi: station.kodLokasi,
-                region: station.region,
-                submittedBy: submittedBy.trim() || 'Anonymous',
-                capturedAt: new Date().toISOString(),
-                enableAI,
-                manualData: {
-                    receiptNo: receiptNo.trim() || null,
-                    dateOnReceipt: dateOnReceipt.trim() || null,
-                    fuelType: fuelType || null,
-                    litres: litresNum!,
-                    amount: amountNum!,
-                    pricePerLitre: pricePerLitre,
-                    vehicleReg: vehicleReg.trim(),
-                    odometerCurrent: odomCurrent!,
-                    odometerPrevious: odomPrevious,
-                    distance,
-                    fuelEfficiency,
-                },
-            });
-
-            setReceiptResult(result);
-            setResultMessage(result.message || 'Receipt recorded successfully');
-            setPhase('success');
-
-            // Save to local history
-            addReceiptToHistory({
-                timestamp: new Date().toISOString(),
-                station: station.name,
-                kodLokasi: station.kodLokasi,
-                region: station.region,
-                submittedBy: submittedBy.trim() || 'Anonymous',
-                vehicleReg: vehicleReg.trim(),
-                odometerCurrent: odomCurrent,
-                manualData: {
-                    receiptNo: receiptNo.trim() || null,
-                    dateOnReceipt: dateOnReceipt.trim() || null,
-                    fuelType: fuelType || null,
-                    litres: litresNum!,
-                    amount: amountNum!,
-                    pricePerLitre: pricePerLitre,
-                    vehicleReg: vehicleReg.trim(),
-                    odometerCurrent: odomCurrent!,
-                    odometerPrevious: odomPrevious,
-                    distance,
-                    fuelEfficiency,
-                },
-                response: result,
-            });
-        } catch (err) {
-            setPhase('error');
-            setResultMessage(err instanceof Error ? err.message : 'Failed to submit receipt.');
-        } finally {
-            submitInFlight.current = false;
-        }
-    };
-
-    const handleReset = () => {
-        setPhase('idle');
-        setCurrentStep(1);
-        setImagePreview(null);
-        setImageBase64(null);
-        setVehicleReg('');
-        setOdometerCurrent('');
-        setOdometerPrevious('');
-        setSubmittedBy('');
-        setReceiptNo('');
-        setDateOnReceipt(new Date().toISOString().split('T')[0]);
-        setFuelType('Petrol');
-        setLitres('');
-        setAmount('');
-        setEnableAI(true);
-        setResultMessage('');
-        setReceiptResult(null);
-        setDuplicateWarning(false);
-        setTouchedFields(new Set());
-        submitInFlight.current = false;
-        if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-
-    // --- Render helpers ---
-    const isLoading = phase === 'submitting';
+function Step1Content({
+    imagePreview, imageBase64, vehicleReg, odometerCurrent, odometerPrevious,
+    isLoading, touchedFields, fileInputRef, onImageClick, onRemoveImage,
+    onFileChange, onVehicleRegChange, onOdometerCurrentChange, onOdometerPreviousChange,
+    onMarkTouched, onNext
+}: Step1Props) {
     const showError = (field: string, condition: boolean) => touchedFields.has(field) && condition;
+    const step1Valid = imageBase64 != null && vehicleReg.trim().length > 0 && odometerCurrent.trim().length > 0;
+    const distance = parseFloat(odometerCurrent) && parseFloat(odometerPrevious) 
+        ? parseFloat(odometerCurrent) - parseFloat(odometerPrevious) 
+        : null;
 
-    // --- Step 1: Photo & Vehicle ---
-    const Step1Content = () => (
+    return (
         <div className="space-y-6">
             {/* Photo Capture */}
             <div className="space-y-2">
@@ -256,7 +66,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                 {!imagePreview ? (
                     <button
                         type="button"
-                        onClick={() => fileInputRef.current?.click()}
+                        onClick={onImageClick}
                         disabled={isLoading}
                         className={`w-full h-40 flex flex-col items-center justify-center gap-3 border-2 border-dashed rounded-xl hover:bg-slate-50 transition-all disabled:opacity-50 ${
                             showError('image', !imageBase64) ? 'border-red-400 bg-red-50/50' : 'border-slate-300 hover:border-slate-400'
@@ -271,11 +81,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                         <img src={imagePreview} alt="Receipt" className="w-full h-48 object-cover rounded-xl border border-slate-200/60" />
                         <button
                             type="button"
-                            onClick={() => {
-                                setImagePreview(null);
-                                setImageBase64(null);
-                                if (fileInputRef.current) fileInputRef.current.value = '';
-                            }}
+                            onClick={onRemoveImage}
                             disabled={isLoading}
                             className="absolute top-2 right-2 p-1.5 bg-white/90 backdrop-blur-sm rounded-lg hover:bg-white transition-colors disabled:opacity-50 shadow-sm"
                         >
@@ -288,7 +94,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                     type="file"
                     accept="image/*"
                     capture="environment"
-                    onChange={handleFileChange}
+                    onChange={onFileChange}
                     className="hidden"
                 />
             </div>
@@ -301,8 +107,8 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                 <input
                     type="text"
                     value={vehicleReg}
-                    onChange={(e) => setVehicleReg(e.target.value.toUpperCase())}
-                    onBlur={() => markTouched('vehicleReg')}
+                    onChange={(e) => onVehicleRegChange(e.target.value.toUpperCase())}
+                    onBlur={() => onMarkTouched('vehicleReg')}
                     placeholder="e.g., SAB 1234"
                     disabled={isLoading}
                     className={`w-full px-4 py-3 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50 ${
@@ -323,8 +129,8 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                     type="number"
                     inputMode="numeric"
                     value={odometerCurrent}
-                    onChange={(e) => setOdometerCurrent(e.target.value)}
-                    onBlur={() => markTouched('odometerCurrent')}
+                    onChange={(e) => onOdometerCurrentChange(e.target.value)}
+                    onBlur={() => onMarkTouched('odometerCurrent')}
                     placeholder="e.g., 45230"
                     disabled={isLoading}
                     className={`w-full px-4 py-3 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50 ${
@@ -348,17 +154,17 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                             <span className="text-lg font-bold text-blue-900">{parseInt(odometerPrevious).toLocaleString()} km</span>
                             <button
                                 type="button"
-                                onClick={() => setOdometerPrevious('')}
+                                onClick={() => onOdometerPreviousChange('')}
                                 className="text-xs text-blue-600 hover:text-blue-800 underline"
                             >
                                 Edit
                             </button>
                         </div>
                     </div>
-                    {distance != null && (
+                    {distance != null && distance > 0 && (
                         <div className="mt-2 pt-2 border-t border-blue-200/60 flex items-center justify-between text-sm">
                             <span className="text-blue-700">Distance traveled:</span>
-                            <span className="font-semibold text-blue-900">{distance.toFixed(0)} km</span>
+                            <span className="font-semibold text-blue-900">{Math.round(distance)} km</span>
                         </div>
                     )}
                 </div>
@@ -366,7 +172,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
 
             {/* Navigation */}
             <button
-                onClick={handleNextStep}
+                onClick={onNext}
                 disabled={!step1Valid}
                 className="w-full py-3.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
@@ -375,9 +181,38 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
             </button>
         </div>
     );
+}
 
-    // --- Step 2: Fuel Details ---
-    const Step2Content = () => (
+interface Step2Props {
+    litres: string;
+    amount: string;
+    pricePerLitre: number | null;
+    receiptNo: string;
+    dateOnReceipt: string;
+    fuelType: string;
+    isLoading: boolean;
+    touchedFields: Set<string>;
+    onLitresChange: (value: string) => void;
+    onAmountChange: (value: string) => void;
+    onReceiptNoChange: (value: string) => void;
+    onDateChange: (value: string) => void;
+    onFuelTypeChange: (value: string) => void;
+    onMarkTouched: (field: string) => void;
+    onNext: () => void;
+    onBack: () => void;
+}
+
+function Step2Content({
+    litres, amount, pricePerLitre, receiptNo, dateOnReceipt, fuelType,
+    isLoading, touchedFields, onLitresChange, onAmountChange, onReceiptNoChange,
+    onDateChange, onFuelTypeChange, onMarkTouched, onNext, onBack
+}: Step2Props) {
+    const showError = (field: string, condition: boolean) => touchedFields.has(field) && condition;
+    const litresNum = parseFloat(litres) || null;
+    const amountNum = parseFloat(amount) || null;
+    const step2Valid = litresNum != null && litresNum > 0 && amountNum != null && amountNum > 0;
+
+    return (
         <div className="space-y-6">
             {/* Litres & Amount */}
             <div className="grid grid-cols-2 gap-4">
@@ -390,8 +225,8 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                         inputMode="decimal"
                         step="0.01"
                         value={litres}
-                        onChange={(e) => setLitres(e.target.value)}
-                        onBlur={() => markTouched('litres')}
+                        onChange={(e) => onLitresChange(e.target.value)}
+                        onBlur={() => onMarkTouched('litres')}
                         placeholder="45.5"
                         disabled={isLoading}
                         className={`w-full px-4 py-3 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50 ${
@@ -408,8 +243,8 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                         inputMode="decimal"
                         step="0.01"
                         value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        onBlur={() => markTouched('amount')}
+                        onChange={(e) => onAmountChange(e.target.value)}
+                        onBlur={() => onMarkTouched('amount')}
                         placeholder="125.50"
                         disabled={isLoading}
                         className={`w-full px-4 py-3 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50 ${
@@ -444,7 +279,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                             <input
                                 type="text"
                                 value={receiptNo}
-                                onChange={(e) => setReceiptNo(e.target.value)}
+                                onChange={(e) => onReceiptNoChange(e.target.value)}
                                 placeholder="REC-001"
                                 disabled={isLoading}
                                 className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50"
@@ -455,7 +290,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                             <input
                                 type="date"
                                 value={dateOnReceipt}
-                                onChange={(e) => setDateOnReceipt(e.target.value)}
+                                onChange={(e) => onDateChange(e.target.value)}
                                 disabled={isLoading}
                                 className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50"
                             />
@@ -467,7 +302,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                         <div className="relative">
                             <select
                                 value={fuelType}
-                                onChange={(e) => setFuelType(e.target.value)}
+                                onChange={(e) => onFuelTypeChange(e.target.value)}
                                 disabled={isLoading}
                                 className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50 appearance-none"
                             >
@@ -484,14 +319,14 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
             {/* Navigation */}
             <div className="flex gap-3">
                 <button
-                    onClick={handlePrevStep}
+                    onClick={onBack}
                     className="flex-1 py-3.5 px-4 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
                 >
                     <ChevronLeft className="w-5 h-5" />
                     Back
                 </button>
                 <button
-                    onClick={handleNextStep}
+                    onClick={onNext}
                     disabled={!step2Valid}
                     className="flex-1 py-3.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
@@ -501,9 +336,46 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
             </div>
         </div>
     );
+}
 
-    // --- Step 3: Review & Submit ---
-    const Step3Content = () => (
+interface Step3Props {
+    vehicleReg: string;
+    odometerCurrent: string;
+    odometerPrevious: string;
+    litres: string;
+    amount: string;
+    pricePerLitre: number | null;
+    submittedBy: string;
+    enableAI: boolean;
+    isLoading: boolean;
+    duplicateWarning: boolean;
+    stationName: string;
+    onSubmittedByChange: (value: string) => void;
+    onEnableAIChange: () => void;
+    onSubmit: () => void;
+    onBack: () => void;
+    onCancelDuplicate: () => void;
+}
+
+function Step3Content({
+    vehicleReg, odometerCurrent, odometerPrevious, litres, amount, pricePerLitre,
+    submittedBy, enableAI, isLoading,
+    duplicateWarning, stationName, onSubmittedByChange, onEnableAIChange,
+    onSubmit, onBack, onCancelDuplicate
+}: Step3Props) {
+    const odomCurrent = parseFloat(odometerCurrent) || null;
+    const odomPrevious = parseFloat(odometerPrevious) || null;
+    const distance = odomCurrent != null && odomPrevious != null && odomCurrent > odomPrevious
+        ? odomCurrent - odomPrevious
+        : null;
+    const litresNum = parseFloat(litres) || null;
+    const fuelEfficiency = distance != null && litresNum != null && litresNum > 0
+        ? distance / litresNum
+        : null;
+    const canSubmit = vehicleReg.trim().length > 0 && odometerCurrent.trim().length > 0 &&
+                       litresNum != null && litresNum > 0 && parseFloat(amount) > 0;
+
+    return (
         <div className="space-y-6">
             {/* Summary Card */}
             <div className="p-4 bg-slate-50 border border-slate-200/60 rounded-xl space-y-3">
@@ -550,7 +422,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                 <input
                     type="text"
                     value={submittedBy}
-                    onChange={(e) => setSubmittedBy(e.target.value)}
+                    onChange={(e) => onSubmittedByChange(e.target.value)}
                     placeholder="Anonymous"
                     disabled={isLoading}
                     className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50"
@@ -568,7 +440,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                             </div>
                             <button
                                 type="button"
-                                onClick={() => setEnableAI(!enableAI)}
+                                onClick={onEnableAIChange}
                                 disabled={isLoading}
                                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 disabled:opacity-50 ${
                                     enableAI ? 'bg-violet-600' : 'bg-slate-300'
@@ -595,17 +467,17 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
             {duplicateWarning && (
                 <div className="p-4 bg-amber-50 border border-amber-200/60 rounded-xl">
                     <p className="text-sm text-amber-800 mb-3">
-                        You submitted a receipt for {station.name} less than 5 minutes ago. Continue?
+                        You submitted a receipt for {stationName} less than 5 minutes ago. Continue?
                     </p>
                     <div className="flex gap-2">
                         <button
-                            onClick={() => handleSubmit(true)}
+                            onClick={() => onSubmit()}
                             className="flex-1 py-2 px-4 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg transition-colors"
                         >
                             Yes, Continue
                         </button>
                         <button
-                            onClick={() => setDuplicateWarning(false)}
+                            onClick={onCancelDuplicate}
                             className="flex-1 py-2 px-4 bg-white hover:bg-slate-50 text-slate-700 font-medium border border-slate-300 rounded-lg transition-colors"
                         >
                             Cancel
@@ -617,14 +489,14 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
             {/* Navigation */}
             <div className="flex gap-3">
                 <button
-                    onClick={handlePrevStep}
+                    onClick={onBack}
                     className="flex-1 py-3.5 px-4 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
                 >
                     <ChevronLeft className="w-5 h-5" />
                     Back
                 </button>
                 <button
-                    onClick={() => handleSubmit()}
+                    onClick={() => onSubmit()}
                     disabled={!canSubmit || isLoading}
                     className="flex-1 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
@@ -643,6 +515,227 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
             </div>
         </div>
     );
+}
+
+// --- Main Component ---
+
+export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
+    // --- Step state ---
+    const [currentStep, setCurrentStep] = useState<Step>(1);
+    const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+    
+    // --- Image state ---
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [imageBase64, setImageBase64] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const submitInFlight = useRef(false);
+
+    // --- Form state ---
+    const [vehicleReg, setVehicleReg] = useState('');
+    const [odometerCurrent, setOdometerCurrent] = useState('');
+    const [odometerPrevious, setOdometerPrevious] = useState('');
+    const [submittedBy, setSubmittedBy] = useState('');
+    const [enableAI, setEnableAI] = useState(true);
+    
+    // Receipt Details
+    const [receiptNo, setReceiptNo] = useState('');
+    const [dateOnReceipt, setDateOnReceipt] = useState(() => {
+        const today = new Date();
+        return today.toISOString().split('T')[0];
+    });
+    const [fuelType, setFuelType] = useState('Petrol');
+    const [litres, setLitres] = useState('');
+    const [amount, setAmount] = useState('');
+
+    // --- Phase & result state ---
+    const [phase, setPhase] = useState<Phase>('idle');
+    const [resultMessage, setResultMessage] = useState('');
+    const [receiptResult, setReceiptResult] = useState<ReceiptResponse | null>(null);
+    const [duplicateWarning, setDuplicateWarning] = useState(false);
+
+    // --- Auto-fill previous odometer when vehicle reg changes ---
+    useEffect(() => {
+        if (vehicleReg.trim().length >= 3) {
+            const prev = getLastOdometerForVehicle(vehicleReg);
+            if (prev != null) {
+                setOdometerPrevious(String(prev));
+            }
+        }
+    }, [vehicleReg]);
+
+    // --- Calculations ---
+    const litresNum = parseFloat(litres) || null;
+    const amountNum = parseFloat(amount) || null;
+
+    // Auto-calculate Price per Litre
+    const pricePerLitre = useMemo(() => {
+        if (amountNum != null && litresNum != null && litresNum > 0) {
+            return amountNum / litresNum;
+        }
+        return null;
+    }, [amountNum, litresNum]);
+
+    // --- Handlers (useCallback to prevent unnecessary re-renders) ---
+    const markTouched = useCallback((field: string) => {
+        setTouchedFields(prev => new Set([...prev, field]));
+    }, []);
+
+    const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const previewUrl = URL.createObjectURL(file);
+        setImagePreview(previewUrl);
+        try {
+            const base64 = await compressImage(file);
+            setImageBase64(base64);
+            markTouched('image');
+        } catch {
+            setImagePreview(null);
+            setImageBase64(null);
+            setResultMessage('Failed to process image. Try again.');
+            setPhase('error');
+        }
+    }, [markTouched]);
+
+    const handleRemoveImage = useCallback(() => {
+        setImagePreview(null);
+        setImageBase64(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    }, []);
+
+    const handleNextStep = useCallback(() => {
+        if (currentStep === 1) {
+            ['image', 'vehicleReg', 'odometerCurrent'].forEach(markTouched);
+            if (imageBase64 && vehicleReg.trim() && odometerCurrent.trim()) {
+                setCurrentStep(2);
+            }
+        } else if (currentStep === 2) {
+            ['litres', 'amount'].forEach(markTouched);
+            if (litresNum != null && litresNum > 0 && amountNum != null && amountNum > 0) {
+                setCurrentStep(3);
+            }
+        }
+    }, [currentStep, imageBase64, vehicleReg, odometerCurrent, litresNum, amountNum, markTouched]);
+
+    const handlePrevStep = useCallback(() => {
+        if (currentStep === 2) setCurrentStep(1);
+        else if (currentStep === 3) setCurrentStep(2);
+    }, [currentStep]);
+
+    const odomCurrent = parseFloat(odometerCurrent) || null;
+    const odomPrevious = parseFloat(odometerPrevious) || null;
+    const distance = odomCurrent != null && odomPrevious != null && odomCurrent > odomPrevious
+        ? odomCurrent - odomPrevious
+        : null;
+    const fuelEfficiency = distance != null && litresNum != null && litresNum > 0
+        ? distance / litresNum
+        : null;
+
+    const handleSubmit = useCallback(async (bypassDuplicateCheck = false) => {
+        if (!imageBase64 || submitInFlight.current || !vehicleReg.trim() || !odometerCurrent.trim() || !litresNum || !amountNum) return;
+
+        // Duplicate check
+        if (!bypassDuplicateCheck) {
+            const recentDuplicate = getReceiptHistory().find(entry =>
+                entry.kodLokasi === station.kodLokasi &&
+                entry.response.status === 'Saved' &&
+                Date.now() - new Date(entry.timestamp).getTime() < 5 * 60 * 1000
+            );
+            if (recentDuplicate) {
+                setDuplicateWarning(true);
+                return;
+            }
+        }
+
+        setDuplicateWarning(false);
+        submitInFlight.current = true;
+        setPhase('submitting');
+        setResultMessage('');
+
+        try {
+            const result = await submitReceipt({
+                image: imageBase64,
+                station: station.name,
+                kodLokasi: station.kodLokasi,
+                region: station.region,
+                submittedBy: submittedBy.trim() || 'Anonymous',
+                capturedAt: new Date().toISOString(),
+                enableAI,
+                manualData: {
+                    receiptNo: receiptNo.trim() || null,
+                    dateOnReceipt: dateOnReceipt.trim() || null,
+                    fuelType: fuelType || null,
+                    litres: litresNum,
+                    amount: amountNum,
+                    pricePerLitre: pricePerLitre,
+                    vehicleReg: vehicleReg.trim(),
+                    odometerCurrent: odomCurrent!,
+                    odometerPrevious: odomPrevious,
+                    distance,
+                    fuelEfficiency,
+                },
+            });
+
+            setReceiptResult(result);
+            setResultMessage(result.message || 'Receipt recorded successfully');
+            setPhase('success');
+
+            // Save to local history
+            addReceiptToHistory({
+                timestamp: new Date().toISOString(),
+                station: station.name,
+                kodLokasi: station.kodLokasi,
+                region: station.region,
+                submittedBy: submittedBy.trim() || 'Anonymous',
+                vehicleReg: vehicleReg.trim(),
+                odometerCurrent: odomCurrent,
+                manualData: {
+                    receiptNo: receiptNo.trim() || null,
+                    dateOnReceipt: dateOnReceipt.trim() || null,
+                    fuelType: fuelType || null,
+                    litres: litresNum,
+                    amount: amountNum,
+                    pricePerLitre: pricePerLitre,
+                    vehicleReg: vehicleReg.trim(),
+                    odometerCurrent: odomCurrent!,
+                    odometerPrevious: odomPrevious,
+                    distance,
+                    fuelEfficiency,
+                },
+                response: result,
+            });
+        } catch (err) {
+            setPhase('error');
+            setResultMessage(err instanceof Error ? err.message : 'Failed to submit receipt.');
+        } finally {
+            submitInFlight.current = false;
+        }
+    }, [imageBase64, vehicleReg, odometerCurrent, litresNum, amountNum, pricePerLitre, odomCurrent, odomPrevious, distance, fuelEfficiency, submittedBy, enableAI, station, receiptNo, dateOnReceipt, fuelType]);
+
+    const handleReset = useCallback(() => {
+        setPhase('idle');
+        setCurrentStep(1);
+        setImagePreview(null);
+        setImageBase64(null);
+        setVehicleReg('');
+        setOdometerCurrent('');
+        setOdometerPrevious('');
+        setSubmittedBy('');
+        setReceiptNo('');
+        setDateOnReceipt(new Date().toISOString().split('T')[0]);
+        setFuelType('Petrol');
+        setLitres('');
+        setAmount('');
+        setEnableAI(true);
+        setResultMessage('');
+        setReceiptResult(null);
+        setDuplicateWarning(false);
+        setTouchedFields(new Set());
+        submitInFlight.current = false;
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    }, []);
+
+    const isLoading = phase === 'submitting';
 
     return (
         <motion.div
@@ -797,9 +890,66 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: -20 }}
                             >
-                                {currentStep === 1 && <Step1Content />}
-                                {currentStep === 2 && <Step2Content />}
-                                {currentStep === 3 && <Step3Content />}
+                                {currentStep === 1 && (
+                                    <Step1Content
+                                        imagePreview={imagePreview}
+                                        imageBase64={imageBase64}
+                                        vehicleReg={vehicleReg}
+                                        odometerCurrent={odometerCurrent}
+                                        odometerPrevious={odometerPrevious}
+                                        isLoading={isLoading}
+                                        touchedFields={touchedFields}
+                                        fileInputRef={fileInputRef}
+                                        onImageClick={() => fileInputRef.current?.click()}
+                                        onRemoveImage={handleRemoveImage}
+                                        onFileChange={handleFileChange}
+                                        onVehicleRegChange={setVehicleReg}
+                                        onOdometerCurrentChange={setOdometerCurrent}
+                                        onOdometerPreviousChange={setOdometerPrevious}
+                                        onMarkTouched={markTouched}
+                                        onNext={handleNextStep}
+                                    />
+                                )}
+                                {currentStep === 2 && (
+                                    <Step2Content
+                                        litres={litres}
+                                        amount={amount}
+                                        pricePerLitre={pricePerLitre}
+                                        receiptNo={receiptNo}
+                                        dateOnReceipt={dateOnReceipt}
+                                        fuelType={fuelType}
+                                        isLoading={isLoading}
+                                        touchedFields={touchedFields}
+                                        onLitresChange={setLitres}
+                                        onAmountChange={setAmount}
+                                        onReceiptNoChange={setReceiptNo}
+                                        onDateChange={setDateOnReceipt}
+                                        onFuelTypeChange={setFuelType}
+                                        onMarkTouched={markTouched}
+                                        onNext={handleNextStep}
+                                        onBack={handlePrevStep}
+                                    />
+                                )}
+                                {currentStep === 3 && (
+                                    <Step3Content
+                                        vehicleReg={vehicleReg}
+                                        odometerCurrent={odometerCurrent}
+                                        odometerPrevious={odometerPrevious}
+                                        litres={litres}
+                                        amount={amount}
+                                        pricePerLitre={pricePerLitre}
+                                        submittedBy={submittedBy}
+                                        enableAI={enableAI}
+                                        isLoading={isLoading}
+                                        duplicateWarning={duplicateWarning}
+                                        stationName={station.name}
+                                        onSubmittedByChange={setSubmittedBy}
+                                        onEnableAIChange={() => setEnableAI(!enableAI)}
+                                        onSubmit={handleSubmit}
+                                        onBack={handlePrevStep}
+                                        onCancelDuplicate={() => setDuplicateWarning(false)}
+                                    />
+                                )}
                             </motion.div>
                         )}
 
