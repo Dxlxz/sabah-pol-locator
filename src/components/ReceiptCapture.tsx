@@ -3,9 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Camera, X, Send, Loader2, CheckCircle, AlertCircle, User, ExternalLink, Fuel, Receipt } from 'lucide-react';
 import type { Station } from '../data/stations';
 import { submitReceipt, compressImage, type ReceiptResponse } from '../lib/api';
-import { addReceiptToHistory } from '../lib/receipt-history';
+import { addReceiptToHistory, getReceiptHistory } from '../lib/receipt-history';
 
-type SubmitState = 'idle' | 'submitting' | 'success' | 'error' | 'review';
+type SubmitState = 'idle' | 'submitting' | 'success' | 'error' | 'review' | 'rejected';
 
 interface ReceiptCaptureProps {
     station: Station;
@@ -34,7 +34,9 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
     const [submitState, setSubmitState] = useState<SubmitState>('idle');
     const [resultMessage, setResultMessage] = useState('');
     const [receiptResult, setReceiptResult] = useState<ReceiptResponse | null>(null);
+    const [duplicateWarning, setDuplicateWarning] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const submitInFlight = useRef(false);
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -54,9 +56,24 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
         }
     };
 
-    const handleSubmit = async () => {
-        if (!imageBase64) return;
+    const handleSubmit = async (bypassDuplicateCheck = false) => {
+        if (!imageBase64 || submitInFlight.current) return;
 
+        // Duplicate check: warn if same station submitted within 5 minutes
+        if (!bypassDuplicateCheck) {
+            const recentDuplicate = getReceiptHistory().find(entry =>
+                entry.kodLokasi === station.kodLokasi &&
+                entry.response.status === 'Processed' &&
+                Date.now() - new Date(entry.timestamp).getTime() < 5 * 60 * 1000
+            );
+            if (recentDuplicate) {
+                setDuplicateWarning(true);
+                return;
+            }
+        }
+
+        setDuplicateWarning(false);
+        submitInFlight.current = true;
         setSubmitState('submitting');
         setResultMessage('');
         setReceiptResult(null);
@@ -73,7 +90,14 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
 
             setReceiptResult(result);
 
-            // Save to local history
+            // Handle rejected images — don't save to history
+            if (result.status === 'Rejected') {
+                setSubmitState('rejected');
+                setResultMessage(result.message || 'This does not appear to be a fuel receipt.');
+                return;
+            }
+
+            // Save to local history (only for valid submissions)
             addReceiptToHistory({
                 timestamp: new Date().toISOString(),
                 station: station.name,
@@ -95,6 +119,8 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
             setResultMessage(
                 err instanceof Error ? err.message : 'Failed to submit. Check your connection.'
             );
+        } finally {
+            submitInFlight.current = false;
         }
     };
 
@@ -104,10 +130,12 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
         setSubmitState('idle');
         setResultMessage('');
         setReceiptResult(null);
+        setDuplicateWarning(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     const isDone = submitState === 'success' || submitState === 'review';
+    const isRejected = submitState === 'rejected';
     const extracted = receiptResult?.extractedData;
 
     return (
@@ -221,6 +249,34 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                         </div>
                     )}
 
+                    {/* Duplicate warning */}
+                    {duplicateWarning && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="p-3 rounded-xl text-sm bg-amber-50 text-amber-700 space-y-2"
+                        >
+                            <div className="flex items-start gap-2.5">
+                                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                                <p>You submitted a receipt to this station recently. Submit again anyway?</p>
+                            </div>
+                            <div className="flex gap-2 ml-7">
+                                <button
+                                    onClick={() => handleSubmit(true)}
+                                    className="px-3 py-1.5 text-xs font-medium bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+                                >
+                                    Submit Anyway
+                                </button>
+                                <button
+                                    onClick={() => setDuplicateWarning(false)}
+                                    className="px-3 py-1.5 text-xs font-medium bg-white border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </motion.div>
+                    )}
+
                     {/* Result message */}
                     {resultMessage && (
                         <motion.div
@@ -329,9 +385,17 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                         >
                             Done
                         </button>
+                    ) : isRejected ? (
+                        <button
+                            onClick={handleReset}
+                            className="w-full py-3 px-4 bg-red-500 text-white font-medium rounded-xl
+                         hover:bg-red-600 transition-colors text-sm"
+                        >
+                            Try Again
+                        </button>
                     ) : (
                         <button
-                            onClick={handleSubmit}
+                            onClick={() => handleSubmit()}
                             disabled={!imageBase64 || submitState === 'submitting'}
                             className="w-full py-3 px-4 bg-blue-500 text-white font-medium rounded-xl
                          hover:bg-blue-600 transition-colors text-sm

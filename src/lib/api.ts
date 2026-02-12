@@ -20,12 +20,12 @@ export interface ExtractedReceiptData {
     pricePerLitre: number | null;
     vehicleReg: string | null;
     rawText: string | null;
-    confidence: 'high' | 'medium' | 'low' | null;
+    confidence: 'high' | 'medium' | 'low' | 'invalid' | null;
 }
 
 export interface ReceiptResponse {
     success: boolean;
-    status: 'Processed' | 'Review Needed' | 'Error';
+    status: 'Processed' | 'Review Needed' | 'Error' | 'Rejected';
     receiptNo?: string | null;
     message: string;
     extractedData?: ExtractedReceiptData | null;
@@ -46,6 +46,11 @@ export async function submitReceipt(payload: ReceiptPayload): Promise<ReceiptRes
     }
 
     const data: ReceiptResponse = await response.json();
+
+    // Handle rejected images (not an error — the system worked, image was wrong)
+    if (data.success === false && data.status === 'Rejected') {
+        return data;
+    }
 
     // Handle workflow-level errors (success: false from error path)
     if (data.success === false && data.status === 'Error') {
