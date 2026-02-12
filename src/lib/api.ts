@@ -1,71 +1,50 @@
-// n8n webhook API wrapper for POL Receipt submission (two-phase: scan → confirm)
+// n8n webhook API wrapper for POL Receipt submission (single-phase async with optional AI)
 
 const WEBHOOK_URL = 'https://n8n2.earthinfo.com.my/webhook/pol-receipt';
 
-// --- Scan mode payload (phase 1: OCR only) ---
-export interface ScanPayload {
-    mode: 'scan';
-    image: string; // base64 encoded JPEG
-    station: string;
-    kodLokasi: string;
-    region: string;
-    vehicleReg: string;
-    submittedBy: string;
-    capturedAt: string;
-}
-
-// --- Confirm mode payload (phase 2: save to sheets) ---
-export interface ConfirmedData {
+// --- Manual entry data structure ---
+export interface ManualReceiptData {
     receiptNo: string | null;
     dateOnReceipt: string | null;
     fuelType: string | null;
-    litres: number | null;
-    amount: number | null;
+    litres: number;              // Required
+    amount: number;              // Required
     pricePerLitre: number | null;
-    vehicleReg: string;
-    odometerCurrent: number;
+    vehicleReg: string;          // Required
+    odometerCurrent: number;     // Required
     odometerPrevious: number | null;
     distance: number | null;
     fuelEfficiency: number | null;
 }
 
-export interface ConfirmPayload {
-    mode: 'confirm';
-    image: string; // base64 encoded JPEG
+// --- Submit payload (single phase) ---
+export interface SubmitPayload {
+    image: string;              // base64 encoded JPEG
     station: string;
     kodLokasi: string;
     region: string;
     submittedBy: string;
     capturedAt: string;
-    confirmedData: ConfirmedData;
-    ocrConfidence: string;
-    rawText: string;
+    manualData: ManualReceiptData;
+    enableAI?: boolean;         // Optional, default true
 }
 
-// --- Shared response types ---
-export interface ExtractedReceiptData {
-    receiptNo: string | null;
-    dateOnReceipt: string | null;
-    fuelType: string | null;
-    litres: number | null;
-    amount: number | null;
-    pricePerLitre: number | null;
-    vehicleReg: string | null;
-    rawText: string | null;
-    confidence: 'high' | 'medium' | 'low' | 'invalid' | null;
-}
-
+// --- Response types ---
 export interface ReceiptResponse {
     success: boolean;
-    status: 'Processed' | 'Review Needed' | 'Error' | 'Rejected' | 'Scanned';
-    receiptNo?: string | null;
+    receiptId: string;
+    status: 'Saved';
     message: string;
-    extractedData?: ExtractedReceiptData | null;
-    imageUrl?: string | null;
+    verificationStatus: string;
+    aiVerification: {
+        enabled: boolean;
+        status: 'Processing' | 'Not Requested' | 'Completed' | 'Failed' | 'Unavailable';
+    };
+    imageUrl: string | null;
 }
 
-// --- Phase 1: Scan receipt (OCR only, no sheet write) ---
-export async function scanReceipt(payload: ScanPayload): Promise<ReceiptResponse> {
+// --- Submit receipt (upload image + save manual data + optional AI) ---
+export async function submitReceipt(payload: SubmitPayload): Promise<ReceiptResponse> {
     const response = await fetch(WEBHOOK_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -78,29 +57,8 @@ export async function scanReceipt(payload: ScanPayload): Promise<ReceiptResponse
 
     const data: ReceiptResponse = await response.json();
 
-    if (data.success === false && data.status === 'Error') {
-        throw new Error(data.message || 'Receipt scanning failed');
-    }
-
-    return data;
-}
-
-// --- Phase 2: Confirm receipt (upload image + write to sheets) ---
-export async function confirmReceipt(payload: ConfirmPayload): Promise<ReceiptResponse> {
-    const response = await fetch(WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const data: ReceiptResponse = await response.json();
-
-    if (data.success === false && data.status === 'Error') {
-        throw new Error(data.message || 'Receipt confirmation failed');
+    if (data.success === false) {
+        throw new Error(data.message || 'Receipt submission failed');
     }
 
     return data;
