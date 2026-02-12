@@ -15,9 +15,9 @@ interface ReceiptCaptureProps {
 function ConfidenceBadge({ confidence }: { confidence: string | null | undefined }) {
     if (!confidence) return null;
     const colors = {
-        high: 'bg-green-100 text-green-700 border-green-200',
-        medium: 'bg-amber-100 text-amber-700 border-amber-200',
-        low: 'bg-red-100 text-red-700 border-red-200',
+        high: 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
+        medium: 'bg-amber-50 text-amber-700 border-amber-200/60',
+        low: 'bg-red-50 text-red-700 border-red-200/60',
     };
     const colorClass = colors[confidence as keyof typeof colors] || colors.low;
     return (
@@ -142,7 +142,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
         <AnimatePresence>
             {/* Backdrop */}
             <motion.div
-                className="fixed inset-0 z-[2000] bg-black/40 backdrop-blur-sm"
+                className="fixed inset-0 z-[2000] bg-black/30 backdrop-blur-sm"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -151,32 +151,32 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
 
             {/* Modal */}
             <motion.div
-                className="fixed inset-x-3 top-[10%] bottom-auto z-[2001] bg-white rounded-2xl shadow-2xl max-w-md mx-auto overflow-hidden"
+                className="fixed inset-x-3 top-[10%] bottom-auto z-[2001] bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl max-w-md mx-auto overflow-hidden"
                 initial={{ opacity: 0, y: 40, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 40, scale: 0.95 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
                     <div>
-                        <h2 className="text-lg font-bold text-gray-900">Record Receipt</h2>
-                        <p className="text-xs text-gray-500 mt-0.5">{station.name}</p>
+                        <h2 className="text-lg font-bold text-slate-900">Record Receipt</h2>
+                        <p className="text-xs text-slate-500 mt-0.5">{station.name}</p>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 -mr-2 rounded-full hover:bg-gray-100 transition-colors"
+                        className="p-2 -mr-2 rounded-full hover:bg-slate-100 transition-colors"
                     >
-                        <X className="w-5 h-5 text-gray-400" />
+                        <X className="w-5 h-5 text-slate-400" />
                     </button>
                 </div>
 
                 {/* Body */}
-                <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto sidebar-scroll">
                     {/* Station info badge */}
-                    <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-xl">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-xl border border-blue-100/60">
                         <span className="text-xs font-mono font-bold text-blue-700">{station.kodLokasi}</span>
-                        <span className="text-xs text-blue-500">&bull;</span>
+                        <span className="text-xs text-blue-400">&bull;</span>
                         <span className="text-xs text-blue-600 capitalize">{station.region} Zone</span>
                     </div>
 
@@ -196,7 +196,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                             <label
                                 htmlFor="receipt-camera"
                                 className="flex flex-col items-center justify-center gap-3 w-full h-48
-                           border-2 border-dashed border-gray-300 rounded-xl
+                           border-2 border-dashed border-slate-200 rounded-xl
                            cursor-pointer hover:border-blue-400 hover:bg-blue-50/50
                            transition-colors"
                             >
@@ -204,8 +204,8 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                                     <Camera className="w-7 h-7 text-blue-500" />
                                 </div>
                                 <div className="text-center">
-                                    <p className="text-sm font-medium text-gray-700">Take Photo of Receipt</p>
-                                    <p className="text-xs text-gray-400 mt-0.5">Tap to open camera</p>
+                                    <p className="text-sm font-medium text-slate-700">Take Photo of Receipt</p>
+                                    <p className="text-xs text-slate-400 mt-0.5">Tap to open camera</p>
                                 </div>
                             </label>
                         ) : (
@@ -213,7 +213,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                                 <img
                                     src={imagePreview}
                                     alt="Receipt preview"
-                                    className="w-full max-h-56 object-contain rounded-xl bg-gray-50"
+                                    className="w-full max-h-56 object-contain rounded-xl bg-slate-50"
                                 />
                                 {!isDone && (
                                     <button
@@ -230,20 +230,20 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                     {/* Submitted By */}
                     {!isDone && (
                         <div>
-                            <label htmlFor="submitted-by" className="block text-xs font-medium text-gray-600 mb-1.5">
+                            <label htmlFor="submitted-by" className="block text-xs font-medium text-slate-600 mb-1.5">
                                 Your Name (optional)
                             </label>
                             <div className="relative">
-                                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                 <input
                                     id="submitted-by"
                                     type="text"
                                     value={submittedBy}
                                     onChange={(e) => setSubmittedBy(e.target.value)}
                                     placeholder="e.g. Ahmad"
-                                    className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl
-                             focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400
-                             placeholder:text-gray-300"
+                                    className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl
+                             focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300
+                             placeholder:text-slate-300 transition-all"
                                 />
                             </div>
                         </div>
@@ -254,7 +254,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                         <motion.div
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="p-3 rounded-xl text-sm bg-amber-50 text-amber-700 space-y-2"
+                            className="p-3 rounded-xl text-sm bg-amber-50 text-amber-700 border border-amber-200/60 space-y-2"
                         >
                             <div className="flex items-start gap-2.5">
                                 <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
@@ -282,11 +282,11 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                         <motion.div
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className={`flex items-start gap-2.5 p-3 rounded-xl text-sm ${submitState === 'success'
-                                    ? 'bg-green-50 text-green-700'
+                            className={`flex items-start gap-2.5 p-3 rounded-xl text-sm border ${submitState === 'success'
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60'
                                     : submitState === 'review'
-                                        ? 'bg-amber-50 text-amber-700'
-                                        : 'bg-red-50 text-red-700'
+                                        ? 'bg-amber-50 text-amber-700 border-amber-200/60'
+                                        : 'bg-red-50 text-red-700 border-red-200/60'
                                 }`}
                         >
                             {submitState === 'success' ? (
@@ -306,12 +306,12 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.15 }}
-                            className="bg-gray-50 rounded-xl p-4 space-y-3"
+                            className="bg-slate-50 rounded-xl p-4 space-y-3 border border-slate-100"
                         >
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <Receipt className="w-4 h-4 text-gray-500" />
-                                    <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Extracted Data</span>
+                                    <Receipt className="w-4 h-4 text-slate-500" />
+                                    <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Extracted Data</span>
                                 </div>
                                 <ConfidenceBadge confidence={extracted.confidence} />
                             </div>
@@ -319,41 +319,41 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                             <div className="grid grid-cols-2 gap-2 text-sm">
                                 {extracted.receiptNo && (
                                     <div>
-                                        <p className="text-xs text-gray-400">Receipt No</p>
-                                        <p className="font-mono font-medium text-gray-800">{extracted.receiptNo}</p>
+                                        <p className="text-xs text-slate-400">Receipt No</p>
+                                        <p className="font-mono font-medium text-slate-800">{extracted.receiptNo}</p>
                                     </div>
                                 )}
                                 {extracted.fuelType && (
                                     <div>
-                                        <p className="text-xs text-gray-400">Fuel Type</p>
+                                        <p className="text-xs text-slate-400">Fuel Type</p>
                                         <div className="flex items-center gap-1">
-                                            <Fuel className="w-3.5 h-3.5 text-gray-500" />
-                                            <p className="font-medium text-gray-800">{extracted.fuelType}</p>
+                                            <Fuel className="w-3.5 h-3.5 text-slate-500" />
+                                            <p className="font-medium text-slate-800">{extracted.fuelType}</p>
                                         </div>
                                     </div>
                                 )}
                                 {extracted.litres != null && (
                                     <div>
-                                        <p className="text-xs text-gray-400">Litres</p>
-                                        <p className="font-medium text-gray-800">{extracted.litres} L</p>
+                                        <p className="text-xs text-slate-400">Litres</p>
+                                        <p className="font-medium text-slate-800">{extracted.litres} L</p>
                                     </div>
                                 )}
                                 {extracted.amount != null && (
                                     <div>
-                                        <p className="text-xs text-gray-400">Amount</p>
-                                        <p className="font-bold text-gray-900">RM {extracted.amount.toFixed(2)}</p>
+                                        <p className="text-xs text-slate-400">Amount</p>
+                                        <p className="font-bold text-slate-900">RM {extracted.amount.toFixed(2)}</p>
                                     </div>
                                 )}
                                 {extracted.pricePerLitre != null && (
                                     <div>
-                                        <p className="text-xs text-gray-400">Price/Litre</p>
-                                        <p className="font-medium text-gray-800">RM {extracted.pricePerLitre.toFixed(2)}</p>
+                                        <p className="text-xs text-slate-400">Price/Litre</p>
+                                        <p className="font-medium text-slate-800">RM {extracted.pricePerLitre.toFixed(2)}</p>
                                     </div>
                                 )}
                                 {extracted.vehicleReg && (
                                     <div>
-                                        <p className="text-xs text-gray-400">Vehicle Reg</p>
-                                        <p className="font-mono font-medium text-gray-800">{extracted.vehicleReg}</p>
+                                        <p className="text-xs text-slate-400">Vehicle Reg</p>
+                                        <p className="font-mono font-medium text-slate-800">{extracted.vehicleReg}</p>
                                     </div>
                                 )}
                             </div>
@@ -364,7 +364,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                                     href={receiptResult.imageUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex items-center justify-center gap-2 w-full py-2 bg-white border border-gray-200
+                                    className="flex items-center justify-center gap-2 w-full py-2 bg-white border border-slate-200/60
                                      rounded-lg text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors"
                                 >
                                     <ExternalLink className="w-3.5 h-3.5" />
@@ -376,12 +376,12 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                 </div>
 
                 {/* Footer */}
-                <div className="px-5 py-4 border-t border-gray-100">
+                <div className="px-5 py-4 border-t border-slate-100">
                     {isDone ? (
                         <button
                             onClick={onClose}
-                            className="w-full py-3 px-4 bg-gray-100 text-gray-700 font-medium rounded-xl
-                         hover:bg-gray-200 transition-colors text-sm"
+                            className="w-full py-3 px-4 bg-slate-100 text-slate-700 font-medium rounded-xl
+                         hover:bg-slate-200 transition-colors text-sm"
                         >
                             Done
                         </button>
