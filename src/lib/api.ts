@@ -11,11 +11,25 @@ export interface ReceiptPayload {
     capturedAt: string;
 }
 
+export interface ExtractedReceiptData {
+    receiptNo: string | null;
+    dateOnReceipt: string | null;
+    fuelType: string | null;
+    litres: number | null;
+    amount: number | null;
+    pricePerLitre: number | null;
+    vehicleReg: string | null;
+    rawText: string | null;
+    confidence: 'high' | 'medium' | 'low' | null;
+}
+
 export interface ReceiptResponse {
     success: boolean;
-    status: 'Processed' | 'Review Needed';
-    receiptNo?: string;
+    status: 'Processed' | 'Review Needed' | 'Error';
+    receiptNo?: string | null;
     message: string;
+    extractedData?: ExtractedReceiptData | null;
+    imageUrl?: string | null;
 }
 
 export async function submitReceipt(payload: ReceiptPayload): Promise<ReceiptResponse> {
@@ -31,7 +45,14 @@ export async function submitReceipt(payload: ReceiptPayload): Promise<ReceiptRes
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    return response.json();
+    const data: ReceiptResponse = await response.json();
+
+    // Handle workflow-level errors (success: false from error path)
+    if (data.success === false && data.status === 'Error') {
+        throw new Error(data.message || 'Receipt processing failed');
+    }
+
+    return data;
 }
 
 /**

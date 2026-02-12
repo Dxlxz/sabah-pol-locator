@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import { Navigation, X, ExternalLink, Layers, Camera } from 'lucide-react';
+import { Navigation, X, ExternalLink, Layers, Camera, History } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import L from 'leaflet';
 import { stations, type Station } from './data/stations';
 import { useIsMobile } from './hooks/use-mobile';
 import { ReceiptCapture } from './components/ReceiptCapture';
+import { ReceiptHistory } from './components/ReceiptHistory';
 
 // Fuel pump SVG for map markers (white stroke, 18x18 inside 36px circle)
 const fuelSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="15" y1="22" y2="22"/><line x1="4" x2="14" y1="9" y2="9"/><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18"/><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2 2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"/></svg>`;
@@ -263,6 +264,7 @@ function App() {
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [activeBasemap, setActiveBasemap] = useState('streets');
   const [receiptStation, setReceiptStation] = useState<Station | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const currentBasemap = basemaps.find(b => b.id === activeBasemap) || basemaps[0];
 
@@ -275,6 +277,17 @@ function App() {
 
   return (
     <div className="h-screen w-screen relative">
+      {/* History button — top left */}
+      <div className="absolute top-4 left-4 z-[1000]">
+        <button
+          onClick={() => setHistoryOpen(true)}
+          className="w-10 h-10 bg-white rounded-lg shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-200"
+          title="Receipt History"
+        >
+          <History className="w-5 h-5 text-gray-700" />
+        </button>
+      </div>
+
       <BasemapControl activeId={activeBasemap} onChange={setActiveBasemap} />
 
       <MapContainer
@@ -320,6 +333,9 @@ function App() {
           onClose={() => setReceiptStation(null)}
         />
       )}
+
+      {/* Receipt history panel */}
+      <ReceiptHistory open={historyOpen} onClose={() => setHistoryOpen(false)} />
     </div>
   );
 }

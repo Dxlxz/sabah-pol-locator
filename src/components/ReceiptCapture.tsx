@@ -1,8 +1,9 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, X, Send, Loader2, CheckCircle, AlertCircle, User } from 'lucide-react';
+import { Camera, X, Send, Loader2, CheckCircle, AlertCircle, User, ExternalLink, Fuel, Receipt } from 'lucide-react';
 import type { Station } from '../data/stations';
-import { submitReceipt, compressImage } from '../lib/api';
+import { submitReceipt, compressImage, type ReceiptResponse } from '../lib/api';
+import { addReceiptToHistory } from '../lib/receipt-history';
 
 type SubmitState = 'idle' | 'submitting' | 'success' | 'error' | 'review';
 
@@ -11,23 +12,37 @@ interface ReceiptCaptureProps {
     onClose: () => void;
 }
 
+function ConfidenceBadge({ confidence }: { confidence: string | null | undefined }) {
+    if (!confidence) return null;
+    const colors = {
+        high: 'bg-green-100 text-green-700 border-green-200',
+        medium: 'bg-amber-100 text-amber-700 border-amber-200',
+        low: 'bg-red-100 text-red-700 border-red-200',
+    };
+    const colorClass = colors[confidence as keyof typeof colors] || colors.low;
+    return (
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${colorClass}`}>
+            {confidence} confidence
+        </span>
+    );
+}
+
 export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [imageBase64, setImageBase64] = useState<string | null>(null);
     const [submittedBy, setSubmittedBy] = useState('');
     const [submitState, setSubmitState] = useState<SubmitState>('idle');
     const [resultMessage, setResultMessage] = useState('');
+    const [receiptResult, setReceiptResult] = useState<ReceiptResponse | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Show preview immediately
         const previewUrl = URL.createObjectURL(file);
         setImagePreview(previewUrl);
 
-        // Compress and convert to base64
         try {
             const base64 = await compressImage(file);
             setImageBase64(base64);
@@ -44,6 +59,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
 
         setSubmitState('submitting');
         setResultMessage('');
+        setReceiptResult(null);
 
         try {
             const result = await submitReceipt({
@@ -53,6 +69,18 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                 region: station.region,
                 submittedBy: submittedBy.trim() || 'Anonymous',
                 capturedAt: new Date().toISOString(),
+            });
+
+            setReceiptResult(result);
+
+            // Save to local history
+            addReceiptToHistory({
+                timestamp: new Date().toISOString(),
+                station: station.name,
+                kodLokasi: station.kodLokasi,
+                region: station.region,
+                submittedBy: submittedBy.trim() || 'Anonymous',
+                response: result,
             });
 
             if (result.status === 'Processed') {
@@ -75,10 +103,12 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
         setImageBase64(null);
         setSubmitState('idle');
         setResultMessage('');
+        setReceiptResult(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     const isDone = submitState === 'success' || submitState === 'review';
+    const extracted = receiptResult?.extractedData;
 
     return (
         <AnimatePresence>
@@ -118,7 +148,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                     {/* Station info badge */}
                     <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-xl">
                         <span className="text-xs font-mono font-bold text-blue-700">{station.kodLokasi}</span>
-                        <span className="text-xs text-blue-500">•</span>
+                        <span className="text-xs text-blue-500">&bull;</span>
                         <span className="text-xs text-blue-600 capitalize">{station.region} Zone</span>
                     </div>
 
@@ -137,9 +167,9 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                         {!imagePreview ? (
                             <label
                                 htmlFor="receipt-camera"
-                                className="flex flex-col items-center justify-center gap-3 w-full h-48 
-                           border-2 border-dashed border-gray-300 rounded-xl 
-                           cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 
+                                className="flex flex-col items-center justify-center gap-3 w-full h-48
+                           border-2 border-dashed border-gray-300 rounded-xl
+                           cursor-pointer hover:border-blue-400 hover:bg-blue-50/50
                            transition-colors"
                             >
                                 <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center">
@@ -183,7 +213,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                                     value={submittedBy}
                                     onChange={(e) => setSubmittedBy(e.target.value)}
                                     placeholder="e.g. Ahmad"
-                                    className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl 
+                                    className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl
                              focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400
                              placeholder:text-gray-300"
                                 />
@@ -213,6 +243,80 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                             <p>{resultMessage}</p>
                         </motion.div>
                     )}
+
+                    {/* Extracted data card */}
+                    {isDone && extracted && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.15 }}
+                            className="bg-gray-50 rounded-xl p-4 space-y-3"
+                        >
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Receipt className="w-4 h-4 text-gray-500" />
+                                    <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Extracted Data</span>
+                                </div>
+                                <ConfidenceBadge confidence={extracted.confidence} />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                                {extracted.receiptNo && (
+                                    <div>
+                                        <p className="text-xs text-gray-400">Receipt No</p>
+                                        <p className="font-mono font-medium text-gray-800">{extracted.receiptNo}</p>
+                                    </div>
+                                )}
+                                {extracted.fuelType && (
+                                    <div>
+                                        <p className="text-xs text-gray-400">Fuel Type</p>
+                                        <div className="flex items-center gap-1">
+                                            <Fuel className="w-3.5 h-3.5 text-gray-500" />
+                                            <p className="font-medium text-gray-800">{extracted.fuelType}</p>
+                                        </div>
+                                    </div>
+                                )}
+                                {extracted.litres != null && (
+                                    <div>
+                                        <p className="text-xs text-gray-400">Litres</p>
+                                        <p className="font-medium text-gray-800">{extracted.litres} L</p>
+                                    </div>
+                                )}
+                                {extracted.amount != null && (
+                                    <div>
+                                        <p className="text-xs text-gray-400">Amount</p>
+                                        <p className="font-bold text-gray-900">RM {extracted.amount.toFixed(2)}</p>
+                                    </div>
+                                )}
+                                {extracted.pricePerLitre != null && (
+                                    <div>
+                                        <p className="text-xs text-gray-400">Price/Litre</p>
+                                        <p className="font-medium text-gray-800">RM {extracted.pricePerLitre.toFixed(2)}</p>
+                                    </div>
+                                )}
+                                {extracted.vehicleReg && (
+                                    <div>
+                                        <p className="text-xs text-gray-400">Vehicle Reg</p>
+                                        <p className="font-mono font-medium text-gray-800">{extracted.vehicleReg}</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* View receipt image link */}
+                            {receiptResult?.imageUrl && (
+                                <a
+                                    href={receiptResult.imageUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center justify-center gap-2 w-full py-2 bg-white border border-gray-200
+                                     rounded-lg text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors"
+                                >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                    View Receipt Image
+                                </a>
+                            )}
+                        </motion.div>
+                    )}
                 </div>
 
                 {/* Footer */}
@@ -220,7 +324,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                     {isDone ? (
                         <button
                             onClick={onClose}
-                            className="w-full py-3 px-4 bg-gray-100 text-gray-700 font-medium rounded-xl 
+                            className="w-full py-3 px-4 bg-gray-100 text-gray-700 font-medium rounded-xl
                          hover:bg-gray-200 transition-colors text-sm"
                         >
                             Done
@@ -229,7 +333,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                         <button
                             onClick={handleSubmit}
                             disabled={!imageBase64 || submitState === 'submitting'}
-                            className="w-full py-3 px-4 bg-blue-500 text-white font-medium rounded-xl 
+                            className="w-full py-3 px-4 bg-blue-500 text-white font-medium rounded-xl
                          hover:bg-blue-600 transition-colors text-sm
                          disabled:opacity-40 disabled:cursor-not-allowed
                          flex items-center justify-center gap-2"
