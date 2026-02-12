@@ -163,7 +163,12 @@ function StationInfo({
 
         {onRecordReceipt && (
           <button
-            onClick={onRecordReceipt}
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRecordReceipt();
+            }}
             className={`flex items-center justify-center gap-2 w-full bg-emerald-500 text-white font-medium hover:bg-emerald-600 transition-colors ${isPopup ? 'py-2 rounded-lg text-xs' : 'py-3 rounded-xl text-sm'
               }`}
           >
@@ -218,7 +223,14 @@ function StationMarker({
     >
       {!isMobile && (
         <Popup className="station-popup" minWidth={250} maxWidth={300}>
-          <StationInfo station={station} variant="popup" onRecordReceipt={() => onRecordReceipt(station)} />
+          <StationInfo 
+            station={station} 
+            variant="popup" 
+            onRecordReceipt={() => {
+              console.log('[DEBUG] Popup Record Receipt clicked for', station.kodLokasi);
+              onRecordReceipt(station);
+            }} 
+          />
         </Popup>
       )}
     </Marker>
