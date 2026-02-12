@@ -22,6 +22,14 @@ interface ReceiptCaptureProps {
 }
 
 export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
+    // Debug: log when component mounts
+    useEffect(() => {
+        console.log('[DEBUG] ReceiptCapture mounted for station:', station.kodLokasi);
+        return () => {
+            console.log('[DEBUG] ReceiptCapture unmounted');
+        };
+    }, [station]);
+
     // --- Image state ---
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [imageBase64, setImageBase64] = useState<string | null>(null);

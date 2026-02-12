@@ -299,9 +299,15 @@ function App() {
   const currentBasemap = basemaps.find(b => b.id === activeBasemap) || basemaps[0];
 
   const handleOpenReceipt = useCallback((station: Station) => {
+    console.log('[DEBUG] handleOpenReceipt called with station:', station.kodLokasi);
     setSelectedStation(null);
     setReceiptStation(station);
   }, []);
+
+  // Debug: log when receiptStation changes
+  useEffect(() => {
+    console.log('[DEBUG] receiptStation changed:', receiptStation?.kodLokasi || 'null');
+  }, [receiptStation]);
 
   const handleStationSelect = useCallback((station: Station) => {
     setFlyTarget(station);
