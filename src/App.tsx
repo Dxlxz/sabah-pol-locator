@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import { Navigation, X, ExternalLink, Layers } from 'lucide-react';
+import { Navigation, X, ExternalLink, Layers, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import L from 'leaflet';
 import { stations, type Station } from './data/stations';
 import { useIsMobile } from './hooks/use-mobile';
+import { ReceiptCapture } from './components/ReceiptCapture';
 
 // Fuel pump SVG for map markers (white stroke, 18x18 inside 36px circle)
 const fuelSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="15" y1="22" y2="22"/><line x1="4" x2="14" y1="9" y2="9"/><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18"/><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2 2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"/></svg>`;
@@ -70,11 +71,10 @@ function BasemapControl({
             <button
               key={bm.id}
               onClick={() => { onChange(bm.id); setOpen(false); }}
-              className={`w-full px-4 py-2.5 text-left text-sm font-medium transition-colors ${
-                activeId === bm.id
-                  ? 'bg-blue-50 text-blue-600'
-                  : 'text-gray-700 hover:bg-gray-50'
-              }`}
+              className={`w-full px-4 py-2.5 text-left text-sm font-medium transition-colors ${activeId === bm.id
+                ? 'bg-blue-50 text-blue-600'
+                : 'text-gray-700 hover:bg-gray-50'
+                }`}
             >
               {bm.name}
             </button>
@@ -89,9 +89,11 @@ function BasemapControl({
 function StationInfo({
   station,
   variant,
+  onRecordReceipt,
 }: {
   station: Station;
   variant: 'popup' | 'sheet';
+  onRecordReceipt?: () => void;
 }) {
   const isPopup = variant === 'popup';
   const kodLokasiUrl = `https://map.kodlokasi.my/${station.kodLokasi}`;
@@ -121,9 +123,8 @@ function StationInfo({
           href={kodLokasiUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className={`flex items-center justify-center gap-2 w-full bg-blue-500 text-white font-medium no-underline hover:bg-blue-600 transition-colors ${
-            isPopup ? 'py-2 rounded-lg text-xs' : 'py-3 rounded-xl text-sm'
-          }`}
+          className={`flex items-center justify-center gap-2 w-full bg-blue-500 text-white font-medium no-underline hover:bg-blue-600 transition-colors ${isPopup ? 'py-2 rounded-lg text-xs' : 'py-3 rounded-xl text-sm'
+            }`}
         >
           <ExternalLink className={isPopup ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
           KodLokasi Map
@@ -134,13 +135,24 @@ function StationInfo({
           href={googleMapsUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className={`flex items-center justify-center gap-2 w-full bg-gray-100 text-gray-700 font-medium no-underline hover:bg-gray-200 transition-colors ${
-            isPopup ? 'py-2 rounded-lg text-xs' : 'py-3 rounded-xl text-sm'
-          }`}
+          className={`flex items-center justify-center gap-2 w-full bg-gray-100 text-gray-700 font-medium no-underline hover:bg-gray-200 transition-colors ${isPopup ? 'py-2 rounded-lg text-xs' : 'py-3 rounded-xl text-sm'
+            }`}
         >
           <Navigation className={isPopup ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
           Google Maps
         </a>
+
+        {/* Record Receipt — accent action */}
+        {onRecordReceipt && (
+          <button
+            onClick={onRecordReceipt}
+            className={`flex items-center justify-center gap-2 w-full bg-emerald-500 text-white font-medium hover:bg-emerald-600 transition-colors ${isPopup ? 'py-2 rounded-lg text-xs' : 'py-3 rounded-xl text-sm'
+              }`}
+          >
+            <Camera className={isPopup ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
+            Record Receipt
+          </button>
+        )}
       </div>
     </>
   );
@@ -185,7 +197,7 @@ function StationMarker({
     >
       {!isMobile && (
         <Popup className="station-popup" minWidth={250} maxWidth={300}>
-          <StationInfo station={station} variant="popup" />
+          <StationInfo station={station} variant="popup" onRecordReceipt={() => onSelect(station)} />
         </Popup>
       )}
     </Marker>
@@ -196,9 +208,11 @@ function StationMarker({
 function MobileBottomSheet({
   station,
   onClose,
+  onRecordReceipt,
 }: {
   station: Station | null;
   onClose: () => void;
+  onRecordReceipt: () => void;
 }) {
   return (
     <AnimatePresence>
@@ -234,7 +248,7 @@ function MobileBottomSheet({
                 </button>
               </div>
 
-              <StationInfo station={station} variant="sheet" />
+              <StationInfo station={station} variant="sheet" onRecordReceipt={onRecordReceipt} />
             </div>
           </motion.div>
         </>
@@ -248,8 +262,16 @@ function App() {
   const isMobile = useIsMobile();
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [activeBasemap, setActiveBasemap] = useState('streets');
+  const [receiptStation, setReceiptStation] = useState<Station | null>(null);
 
   const currentBasemap = basemaps.find(b => b.id === activeBasemap) || basemaps[0];
+
+  // When "Record Receipt" is tapped in bottom sheet, it calls onClose which
+  // triggers the receipt flow. We need a handler that opens the receipt modal.
+  const handleOpenReceipt = (station: Station) => {
+    setSelectedStation(null); // close bottom sheet
+    setReceiptStation(station);
+  };
 
   return (
     <div className="h-screen w-screen relative">
@@ -276,7 +298,7 @@ function App() {
             key={station.id}
             station={station}
             isMobile={isMobile}
-            onSelect={setSelectedStation}
+            onSelect={isMobile ? setSelectedStation : handleOpenReceipt}
           />
         ))}
       </MapContainer>
@@ -285,6 +307,17 @@ function App() {
         <MobileBottomSheet
           station={selectedStation}
           onClose={() => setSelectedStation(null)}
+          onRecordReceipt={() => {
+            if (selectedStation) handleOpenReceipt(selectedStation);
+          }}
+        />
+      )}
+
+      {/* Receipt capture modal */}
+      {receiptStation && (
+        <ReceiptCapture
+          station={receiptStation}
+          onClose={() => setReceiptStation(null)}
         />
       )}
     </div>
