@@ -1,15 +1,17 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import { Navigation, X, ExternalLink, Layers, Camera, History } from 'lucide-react';
+import { Navigation, X, ExternalLink, Layers, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import L from 'leaflet';
-import { stations, type Station } from './data/stations';
+import { stations, regionColors, type Station } from './data/stations';
 import { useIsMobile } from './hooks/use-mobile';
 import { ReceiptCapture } from './components/ReceiptCapture';
 import { ReceiptHistory } from './components/ReceiptHistory';
+import { Header } from './components/Header';
+import { Sidebar } from './components/Sidebar';
 
-// Fuel pump SVG for map markers (white stroke, 18x18 inside 36px circle)
-const fuelSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="15" y1="22" y2="22"/><line x1="4" x2="14" y1="9" y2="9"/><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18"/><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2 2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"/></svg>`;
+// Fuel pump SVG for map markers (white stroke, 16x16 inside 32px circle)
+const fuelSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="15" y1="22" y2="22"/><line x1="4" x2="14" y1="9" y2="9"/><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18"/><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2 2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"/></svg>`;
 
 // Pre-compute bounds for all stations
 const allStationsBounds = L.latLngBounds(
@@ -25,13 +27,24 @@ function FitBounds({ bounds }: { bounds: L.LatLngBounds }) {
   return null;
 }
 
+// Flies map to a specific station
+function FlyToStation({ station }: { station: Station | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (station) {
+      map.flyTo([station.lat, station.lng], 14, { duration: 0.8 });
+    }
+  }, [map, station]);
+  return null;
+}
+
 // Available basemaps
 const basemaps = [
   {
-    id: 'streets',
-    name: 'Streets',
-    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    id: 'light',
+    name: 'Light',
+    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
   },
   {
     id: 'satellite',
@@ -40,14 +53,14 @@ const basemaps = [
     attribution: '&copy; Esri',
   },
   {
-    id: 'topo',
-    name: 'Topo',
-    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; <a href="https://opentopomap.org">OpenTopoMap</a>',
+    id: 'dark',
+    name: 'Dark',
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
   },
 ] as const;
 
-// Floating basemap switcher control
+// Compact basemap switcher — bottom right
 function BasemapControl({
   activeId,
   onChange,
@@ -58,23 +71,24 @@ function BasemapControl({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="absolute top-4 right-4 z-[1000]">
+    <div className="absolute bottom-6 right-4 z-[1000]">
       <button
         onClick={() => setOpen(!open)}
-        className="w-10 h-10 bg-white rounded-lg shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-200"
+        className="w-9 h-9 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg flex items-center justify-center
+                   hover:bg-white transition-colors border border-slate-200/60"
       >
-        <Layers className="w-5 h-5 text-gray-700" />
+        <Layers className="w-4 h-4 text-slate-600" />
       </button>
 
       {open && (
-        <div className="absolute top-12 right-0 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden min-w-[140px]">
+        <div className="absolute bottom-11 right-0 bg-white/95 backdrop-blur-sm rounded-xl shadow-xl border border-slate-200/60 overflow-hidden min-w-[120px]">
           {basemaps.map((bm) => (
             <button
               key={bm.id}
               onClick={() => { onChange(bm.id); setOpen(false); }}
-              className={`w-full px-4 py-2.5 text-left text-sm font-medium transition-colors ${activeId === bm.id
+              className={`w-full px-3.5 py-2 text-left text-xs font-medium transition-colors ${activeId === bm.id
                 ? 'bg-blue-50 text-blue-600'
-                : 'text-gray-700 hover:bg-gray-50'
+                : 'text-slate-600 hover:bg-slate-50'
                 }`}
             >
               {bm.name}
@@ -102,24 +116,29 @@ function StationInfo({
 
   return (
     <>
-      {/* KodLokasi — primary */}
-      <h3 className={`font-mono font-black text-gray-900 ${isPopup ? 'text-lg' : 'text-2xl'}`}>
-        {station.kodLokasi}
-      </h3>
+      {/* Region badge + KodLokasi */}
+      <div className="flex items-center gap-2">
+        <span
+          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+          style={{ backgroundColor: regionColors[station.region] }}
+        />
+        <h3 className={`font-mono font-black text-slate-900 ${isPopup ? 'text-lg' : 'text-2xl'}`}>
+          {station.kodLokasi}
+        </h3>
+      </div>
 
       {/* Station name */}
-      <p className={`text-gray-600 mt-0.5 ${isPopup ? 'text-sm' : 'text-sm mt-1'}`}>
+      <p className={`text-slate-500 mt-0.5 ${isPopup ? 'text-sm' : 'text-sm mt-1'}`}>
         {station.name}
       </p>
 
       {/* Coordinates */}
-      <p className={`font-mono text-gray-400 ${isPopup ? 'text-xs mt-1.5' : 'text-xs mt-2'}`}>
+      <p className={`font-mono text-slate-400 ${isPopup ? 'text-xs mt-1.5' : 'text-xs mt-2'}`}>
         {station.lat.toFixed(4)}°N, {station.lng.toFixed(4)}°E
       </p>
 
       {/* Action buttons */}
       <div className={`flex flex-col ${isPopup ? 'gap-1.5 mt-2.5' : 'gap-2 mt-4'}`}>
-        {/* KodLokasi map link — primary */}
         <a
           href={kodLokasiUrl}
           target="_blank"
@@ -131,19 +150,17 @@ function StationInfo({
           KodLokasi Map
         </a>
 
-        {/* Google Maps link — secondary */}
         <a
           href={googleMapsUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className={`flex items-center justify-center gap-2 w-full bg-gray-100 text-gray-700 font-medium no-underline hover:bg-gray-200 transition-colors ${isPopup ? 'py-2 rounded-lg text-xs' : 'py-3 rounded-xl text-sm'
+          className={`flex items-center justify-center gap-2 w-full bg-slate-100 text-slate-700 font-medium no-underline hover:bg-slate-200 transition-colors ${isPopup ? 'py-2 rounded-lg text-xs' : 'py-3 rounded-xl text-sm'
             }`}
         >
           <Navigation className={isPopup ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
           Google Maps
         </a>
 
-        {/* Record Receipt — accent action */}
         {onRecordReceipt && (
           <button
             onClick={onRecordReceipt}
@@ -172,16 +189,17 @@ function StationMarker({
   const map = useMap();
 
   const markerIcon = useMemo(() => {
+    const color = regionColors[station.region] || '#6366f1';
     return L.divIcon({
       className: 'custom-div-icon',
       html: `
-        <div class="custom-marker" style="background-color: #3b82f6;">
+        <div class="custom-marker" style="background-color: ${color};">
           ${fuelSvg}
         </div>
         <div class="marker-label">${station.kodLokasi}</div>
       `,
-      iconSize: [40, 56],
-      iconAnchor: [20, 56],
+      iconSize: [36, 50],
+      iconAnchor: [18, 50],
     });
   }, [station]);
 
@@ -219,7 +237,6 @@ function MobileBottomSheet({
     <AnimatePresence>
       {station && (
         <>
-          {/* Backdrop — tap to dismiss */}
           <motion.div
             className="fixed inset-0 z-[1000] bg-black/20"
             initial={{ opacity: 0 }}
@@ -227,7 +244,6 @@ function MobileBottomSheet({
             exit={{ opacity: 0 }}
             onClick={onClose}
           />
-          {/* Sheet */}
           <motion.div
             className="fixed bottom-0 left-0 right-0 z-[1001] bg-white rounded-t-2xl shadow-2xl"
             initial={{ y: '100%' }}
@@ -236,19 +252,15 @@ function MobileBottomSheet({
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
           >
-            {/* Handle bar */}
             <div className="flex justify-center pt-3 pb-2">
-              <div className="w-10 h-1 bg-gray-300 rounded-full" />
+              <div className="w-10 h-1 bg-slate-300 rounded-full" />
             </div>
-
             <div className="px-5 pb-4">
-              {/* Close button — top right */}
               <div className="flex justify-end mb-1">
                 <button onClick={onClose} className="p-1 -mr-1 -mt-1">
-                  <X className="w-5 h-5 text-gray-400" />
+                  <X className="w-5 h-5 text-slate-400" />
                 </button>
               </div>
-
               <StationInfo station={station} variant="sheet" onRecordReceipt={onRecordReceipt} />
             </div>
           </motion.div>
@@ -258,64 +270,90 @@ function MobileBottomSheet({
   );
 }
 
-// Main app — full-screen map with station markers
+// Main app
 function App() {
   const isMobile = useIsMobile();
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
-  const [activeBasemap, setActiveBasemap] = useState('streets');
+  const [activeBasemap, setActiveBasemap] = useState('light');
   const [receiptStation, setReceiptStation] = useState<Station | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeRegion, setActiveRegion] = useState<string | null>(null);
+  const [flyTarget, setFlyTarget] = useState<Station | null>(null);
 
   const currentBasemap = basemaps.find(b => b.id === activeBasemap) || basemaps[0];
 
-  // When "Record Receipt" is tapped in bottom sheet, it calls onClose which
-  // triggers the receipt flow. We need a handler that opens the receipt modal.
-  const handleOpenReceipt = (station: Station) => {
-    setSelectedStation(null); // close bottom sheet
+  const handleOpenReceipt = useCallback((station: Station) => {
+    setSelectedStation(null);
     setReceiptStation(station);
-  };
+  }, []);
+
+  const handleStationSelect = useCallback((station: Station) => {
+    setFlyTarget(station);
+    setSelectedStation(station);
+  }, []);
 
   return (
-    <div className="h-screen w-screen relative">
-      {/* History button — top left */}
-      <div className="absolute top-4 left-4 z-[1000]">
-        <button
-          onClick={() => setHistoryOpen(true)}
-          className="w-10 h-10 bg-white rounded-lg shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-200"
-          title="Receipt History"
-        >
-          <History className="w-5 h-5 text-gray-700" />
-        </button>
+    <div className="flex flex-col h-screen w-screen overflow-hidden">
+      {/* Header */}
+      <Header
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onHistoryOpen={() => setHistoryOpen(true)}
+        onSidebarToggle={() => setSidebarOpen(true)}
+        isMobile={isMobile}
+      />
+
+      {/* Content: sidebar + map */}
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Sidebar */}
+        <Sidebar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          activeRegion={activeRegion}
+          onRegionChange={setActiveRegion}
+          activeStationId={selectedStation?.id ?? null}
+          onStationSelect={handleStationSelect}
+          isMobile={isMobile}
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+        />
+
+        {/* Map */}
+        <div className="flex-1 relative">
+          <BasemapControl activeId={activeBasemap} onChange={setActiveBasemap} />
+
+          <MapContainer
+            bounds={allStationsBounds}
+            style={{ height: '100%', width: '100%' }}
+            zoomControl={false}
+            minZoom={5}
+            maxBounds={[[-90, -180], [90, 180]]}
+            maxBoundsViscosity={1.0}
+          >
+            <TileLayer
+              key={currentBasemap.id}
+              attribution={currentBasemap.attribution}
+              url={currentBasemap.url}
+              noWrap={true}
+            />
+            <FitBounds bounds={allStationsBounds} />
+            <FlyToStation station={flyTarget} />
+
+            {stations.map((station) => (
+              <StationMarker
+                key={station.id}
+                station={station}
+                isMobile={isMobile}
+                onSelect={isMobile ? setSelectedStation : handleOpenReceipt}
+              />
+            ))}
+          </MapContainer>
+        </div>
       </div>
 
-      <BasemapControl activeId={activeBasemap} onChange={setActiveBasemap} />
-
-      <MapContainer
-        bounds={allStationsBounds}
-        style={{ height: '100%', width: '100%' }}
-        zoomControl={!isMobile}
-        minZoom={5}
-        maxBounds={[[-90, -180], [90, 180]]}
-        maxBoundsViscosity={1.0}
-      >
-        <TileLayer
-          key={currentBasemap.id}
-          attribution={currentBasemap.attribution}
-          url={currentBasemap.url}
-          noWrap={true}
-        />
-        <FitBounds bounds={allStationsBounds} />
-
-        {stations.map((station) => (
-          <StationMarker
-            key={station.id}
-            station={station}
-            isMobile={isMobile}
-            onSelect={isMobile ? setSelectedStation : handleOpenReceipt}
-          />
-        ))}
-      </MapContainer>
-
+      {/* Mobile bottom sheet */}
       {isMobile && (
         <MobileBottomSheet
           station={selectedStation}

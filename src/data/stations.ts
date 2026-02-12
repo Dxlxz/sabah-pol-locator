@@ -163,11 +163,11 @@ export const stations: Station[] = [
 ];
 
 export const regionColors: Record<string, string> = {
-  North: '#ef4444', // red-500
-  East: '#3b82f6',  // blue-500
-  West: '#22c55e',  // green-500
+  North: '#f43f5e',   // rose-500
+  East: '#6366f1',    // indigo-500
+  West: '#10b981',    // emerald-500
   Central: '#f59e0b', // amber-500
-  South: '#8b5cf6'  // violet-500
+  South: '#8b5cf6'    // violet-500
 };
 
 export const regionNames: Record<string, string> = {
