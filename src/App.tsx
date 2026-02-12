@@ -353,7 +353,7 @@ function App() {
                 key={station.id}
                 station={station}
                 isMobile={isMobile}
-                onSelect={isMobile ? setSelectedStation : handleOpenReceipt}
+                onSelect={handleStationSelect}
                 onRecordReceipt={handleOpenReceipt}
               />
             ))}
