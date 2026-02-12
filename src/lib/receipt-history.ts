@@ -1,4 +1,4 @@
-import type { ReceiptResponse } from './api';
+import type { ReceiptResponse, ManualReceiptData } from './api';
 
 const STORAGE_KEY = 'pol-receipt-history';
 const MAX_ENTRIES = 50;
@@ -12,6 +12,7 @@ export interface ReceiptHistoryEntry {
     submittedBy: string;
     vehicleReg: string;
     odometerCurrent: number | null;
+    manualData: ManualReceiptData;
     response: ReceiptResponse;
 }
 

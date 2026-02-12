@@ -22,8 +22,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function HistoryDetail({ entry, onBack }: { entry: ReceiptHistoryEntry; onBack: () => void }) {
-    const { response } = entry;
-    const extracted = response.extractedData;
+    const { response, manualData } = entry;
 
     return (
         <div className="space-y-4">
@@ -51,47 +50,47 @@ function HistoryDetail({ entry, onBack }: { entry: ReceiptHistoryEntry; onBack: 
                 </div>
             )}
 
-            {extracted && (
+            {manualData && (
                 <div className="bg-slate-50 rounded-xl p-3 space-y-2 border border-slate-100">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Extracted Data</p>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Receipt Data</p>
                     <div className="grid grid-cols-2 gap-2 text-sm">
-                        {extracted.receiptNo && (
+                        {manualData.receiptNo && (
                             <div>
                                 <p className="text-xs text-slate-400">Receipt No</p>
-                                <p className="font-mono font-medium text-slate-800">{extracted.receiptNo}</p>
+                                <p className="font-mono font-medium text-slate-800">{manualData.receiptNo}</p>
                             </div>
                         )}
-                        {extracted.fuelType && (
+                        {manualData.fuelType && (
                             <div>
                                 <p className="text-xs text-slate-400">Fuel Type</p>
                                 <div className="flex items-center gap-1">
                                     <Fuel className="w-3.5 h-3.5 text-slate-500" />
-                                    <p className="font-medium text-slate-800">{extracted.fuelType}</p>
+                                    <p className="font-medium text-slate-800">{manualData.fuelType}</p>
                                 </div>
                             </div>
                         )}
-                        {extracted.litres != null && (
+                        {manualData.litres != null && (
                             <div>
                                 <p className="text-xs text-slate-400">Litres</p>
-                                <p className="font-medium text-slate-800">{extracted.litres} L</p>
+                                <p className="font-medium text-slate-800">{manualData.litres} L</p>
                             </div>
                         )}
-                        {extracted.amount != null && (
+                        {manualData.amount != null && (
                             <div>
                                 <p className="text-xs text-slate-400">Amount</p>
-                                <p className="font-bold text-slate-900">RM {extracted.amount.toFixed(2)}</p>
+                                <p className="font-bold text-slate-900">RM {manualData.amount.toFixed(2)}</p>
                             </div>
                         )}
-                        {extracted.pricePerLitre != null && (
+                        {manualData.pricePerLitre != null && (
                             <div>
                                 <p className="text-xs text-slate-400">Price/Litre</p>
-                                <p className="font-medium text-slate-800">RM {extracted.pricePerLitre.toFixed(2)}</p>
+                                <p className="font-medium text-slate-800">RM {manualData.pricePerLitre.toFixed(2)}</p>
                             </div>
                         )}
-                        {extracted.vehicleReg && (
+                        {manualData.vehicleReg && (
                             <div>
                                 <p className="text-xs text-slate-400">Vehicle Reg</p>
-                                <p className="font-mono font-medium text-slate-800">{extracted.vehicleReg}</p>
+                                <p className="font-mono font-medium text-slate-800">{manualData.vehicleReg}</p>
                             </div>
                         )}
                     </div>
@@ -208,9 +207,9 @@ export function ReceiptHistory({ open, onClose }: ReceiptHistoryProps) {
                                                 </p>
                                                 <p className="text-xs text-slate-400 mt-0.5">
                                                     {new Date(entry.timestamp).toLocaleDateString()} {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                    {entry.response.extractedData?.amount != null && (
+                                                    {entry.manualData?.amount != null && (
                                                         <span className="ml-2 font-medium text-slate-600">
-                                                            RM {entry.response.extractedData.amount.toFixed(2)}
+                                                            RM {entry.manualData.amount.toFixed(2)}
                                                         </span>
                                                     )}
                                                 </p>

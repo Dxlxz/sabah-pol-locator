@@ -113,7 +113,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
         if (!bypassDuplicateCheck) {
             const recentDuplicate = getReceiptHistory().find(entry =>
                 entry.kodLokasi === station.kodLokasi &&
-                entry.response.status === 'Processed' &&
+                entry.response.status === 'Saved' &&
                 Date.now() - new Date(entry.timestamp).getTime() < 5 * 60 * 1000
             );
             if (recentDuplicate) {
@@ -164,7 +164,20 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                 submittedBy: submittedBy.trim() || 'Anonymous',
                 vehicleReg: vehicleReg.trim(),
                 odometerCurrent: odomCurrent,
-                response: result as any, // Compatible type
+                manualData: {
+                    receiptNo: receiptNo.trim() || null,
+                    dateOnReceipt: dateOnReceipt.trim() || null,
+                    fuelType: fuelType || null,
+                    litres: litresNum!,
+                    amount: amountNum!,
+                    pricePerLitre: parseFloat(pricePerLitre) || null,
+                    vehicleReg: vehicleReg.trim(),
+                    odometerCurrent: odomCurrent!,
+                    odometerPrevious: odomPrevious,
+                    distance,
+                    fuelEfficiency,
+                },
+                response: result,
             });
         } catch (err) {
             setPhase('error');
