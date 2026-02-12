@@ -31,6 +31,8 @@ interface Step1Props {
     vehicleReg: string;
     odometerCurrent: string;
     odometerPrevious: string;
+    useHistoryOdometer: boolean;
+    isEditingOdometer: boolean;
     scanState: 'idle' | 'scanning' | 'success' | 'error';
     scanError: string | null;
     extractedData: ExtractedReceiptData | null;
@@ -43,18 +45,23 @@ interface Step1Props {
     onVehicleRegChange: (value: string) => void;
     onOdometerCurrentChange: (value: string) => void;
     onOdometerPreviousChange: (value: string) => void;
+    onToggleHistory: () => void;
+    onStartEdit: () => void;
+    onClearOdometer: () => void;
     onMarkTouched: (field: string) => void;
     onNext: () => void;
 }
 
 function Step1Content({
     imagePreview, imageBase64, vehicleReg, odometerCurrent, odometerPrevious,
-    scanState, scanError, extractedData, isLoading, touchedFields, fileInputRef,
-    onImageClick, onRemoveImage, onFileChange, onVehicleRegChange,
-    onOdometerCurrentChange, onOdometerPreviousChange, onMarkTouched, onNext
+    useHistoryOdometer, isEditingOdometer, scanState, scanError, extractedData,
+    isLoading, touchedFields, fileInputRef, onImageClick, onRemoveImage,
+    onFileChange, onVehicleRegChange, onOdometerCurrentChange,
+    onOdometerPreviousChange, onToggleHistory, onStartEdit, onClearOdometer,
+    onMarkTouched, onNext
 }: Step1Props) {
     const showError = (field: string, condition: boolean) => touchedFields.has(field) && condition;
-    const step1Valid = imageBase64 != null && vehicleReg.trim().length > 0 && odometerCurrent.trim().length > 0;
+    const step1Valid = imageBase64 != null && vehicleReg.trim().length > 0 && odometerCurrent.trim().length > 0 && odometerPrevious.trim().length > 0;
     const distance = parseFloat(odometerCurrent) && parseFloat(odometerPrevious) 
         ? parseFloat(odometerCurrent) - parseFloat(odometerPrevious) 
         : null;
@@ -179,33 +186,110 @@ function Step1Content({
                 )}
             </div>
 
-            {/* Previous Odometer (Auto-filled) */}
-            {odometerPrevious && (
-                <div className="p-3 bg-blue-50 border border-blue-200/60 rounded-lg">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-blue-900">Previous Odometer</p>
-                            <p className="text-xs text-blue-700">Auto-filled from history</p>
+            {/* Previous Odometer */}
+            <div className="space-y-2">
+                <label className="block text-sm font-medium text-slate-700">
+                    Previous Odometer (km) <span className="text-red-500">*</span>
+                </label>
+                
+                {/* State 1: Using History (Display Mode) */}
+                {useHistoryOdometer && !isEditingOdometer && odometerPrevious && (
+                    <div className="p-4 bg-blue-50 border border-blue-200/60 rounded-xl">
+                        <div className="flex items-center justify-between mb-2">
+                            <div>
+                                <span className="text-2xl font-bold text-blue-900">{parseInt(odometerPrevious).toLocaleString()} km</span>
+                                <p className="text-xs text-blue-700">From history</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={onStartEdit}
+                                    className="px-3 py-1.5 bg-white hover:bg-blue-100 text-blue-700 text-xs font-medium border border-blue-300 rounded-lg transition-colors"
+                                >
+                                    Change
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onToggleHistory}
+                                    className="px-3 py-1.5 bg-white hover:bg-red-100 text-red-600 text-xs font-medium border border-red-300 rounded-lg transition-colors"
+                                >
+                                    Don't use
+                                </button>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-lg font-bold text-blue-900">{parseInt(odometerPrevious).toLocaleString()} km</span>
+                        {distance != null && distance > 0 && (
+                            <div className="pt-2 border-t border-blue-200/60 flex items-center justify-between text-sm">
+                                <span className="text-blue-700">Distance traveled:</span>
+                                <span className="font-semibold text-blue-900">{Math.round(distance)} km</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* State 2: Editing Mode */}
+                {useHistoryOdometer && isEditingOdometer && (
+                    <div className="space-y-3">
+                        <input
+                            type="number"
+                            inputMode="numeric"
+                            value={odometerPrevious}
+                            onChange={(e) => onOdometerPreviousChange(e.target.value)}
+                            placeholder="Enter previous odometer"
+                            disabled={isLoading}
+                            className="w-full px-4 py-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50"
+                        />
+                        <div className="flex gap-2">
                             <button
                                 type="button"
-                                onClick={() => onOdometerPreviousChange('')}
-                                className="text-xs text-blue-600 hover:text-blue-800 underline"
+                                onClick={() => {
+                                    onToggleHistory();
+                                    onToggleHistory();
+                                }}
+                                className="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
                             >
-                                Edit
+                                ✓ Use History
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onClearOdometer}
+                                className="flex-1 py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 text-sm font-medium border border-slate-300 rounded-lg transition-colors"
+                            >
+                                Clear
                             </button>
                         </div>
                     </div>
-                    {distance != null && distance > 0 && (
-                        <div className="mt-2 pt-2 border-t border-blue-200/60 flex items-center justify-between text-sm">
-                            <span className="text-blue-700">Distance traveled:</span>
-                            <span className="font-semibold text-blue-900">{Math.round(distance)} km</span>
-                        </div>
-                    )}
-                </div>
-            )}
+                )}
+
+                {/* State 3: Not Using History (Manual Entry) */}
+                {!useHistoryOdometer && (
+                    <div className="space-y-3">
+                        <input
+                            type="number"
+                            inputMode="numeric"
+                            value={odometerPrevious}
+                            onChange={(e) => onOdometerPreviousChange(e.target.value)}
+                            onBlur={() => onMarkTouched('odometerPrevious')}
+                            placeholder="Enter previous odometer"
+                            disabled={isLoading}
+                            className={`w-full px-4 py-3 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50 ${
+                                showError('odometerPrevious', odometerPrevious.trim().length === 0) ? 'border-red-400' : 'border-slate-300'
+                            }`}
+                        />
+                        {showError('odometerPrevious', odometerPrevious.trim().length === 0) && (
+                            <p className="text-xs text-red-600">Previous odometer is required for distance calculation</p>
+                        )}
+                        {vehicleReg.trim().length >= 3 && (
+                            <button
+                                type="button"
+                                onClick={onToggleHistory}
+                                className="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                            >
+                                <span>🔍</span> Lookup from History
+                            </button>
+                        )}
+                    </div>
+                )}
+            </div>
 
             {/* Navigation */}
             <button
@@ -595,15 +679,22 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
     const [extractedData, setExtractedData] = useState<ExtractedReceiptData | null>(null);
     const [scanError, setScanError] = useState<string | null>(null);
 
-    // --- Auto-fill previous odometer when vehicle reg changes ---
+    // --- Previous Odometer state ---
+    const [useHistoryOdometer, setUseHistoryOdometer] = useState(true);
+    const [isEditingOdometer, setIsEditingOdometer] = useState(false);
+
+    // --- Auto-fill previous odometer when vehicle reg changes (only if using history) ---
     useEffect(() => {
-        if (vehicleReg.trim().length >= 3) {
+        if (useHistoryOdometer && vehicleReg.trim().length >= 3) {
             const prev = getLastOdometerForVehicle(vehicleReg);
             if (prev != null) {
                 setOdometerPrevious(String(prev));
+            } else {
+                // No history found, clear the field
+                setOdometerPrevious('');
             }
         }
-    }, [vehicleReg]);
+    }, [vehicleReg, useHistoryOdometer]);
 
     // --- Calculations ---
     const litresNum = parseFloat(litres) || null;
@@ -678,9 +769,32 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
         if (fileInputRef.current) fileInputRef.current.value = '';
     }, []);
 
+    // Previous Odometer handlers
+    const handleToggleHistory = useCallback(() => {
+        setUseHistoryOdometer(prev => !prev);
+        setIsEditingOdometer(false);
+        if (!useHistoryOdometer) {
+            // Switching to history - reload from history
+            const prev = getLastOdometerForVehicle(vehicleReg);
+            setOdometerPrevious(prev != null ? String(prev) : '');
+        } else {
+            // Switching to manual - clear the field
+            setOdometerPrevious('');
+        }
+    }, [vehicleReg, useHistoryOdometer]);
+
+    const handleStartEditOdometer = useCallback(() => {
+        setIsEditingOdometer(true);
+    }, []);
+
+    const handleClearOdometer = useCallback(() => {
+        setOdometerPrevious('');
+        setIsEditingOdometer(false);
+    }, []);
+
     const handleNextStep = useCallback(() => {
         if (currentStep === 1) {
-            ['image', 'vehicleReg', 'odometerCurrent'].forEach(markTouched);
+            ['image', 'vehicleReg', 'odometerCurrent', 'odometerPrevious'].forEach(markTouched);
             if (imageBase64 && vehicleReg.trim() && odometerCurrent.trim()) {
                 setCurrentStep(2);
             }
@@ -806,6 +920,11 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
         setReceiptResult(null);
         setDuplicateWarning(false);
         setTouchedFields(new Set());
+        setUseHistoryOdometer(true);
+        setIsEditingOdometer(false);
+        setScanState('idle');
+        setExtractedData(null);
+        setScanError(null);
         submitInFlight.current = false;
         if (fileInputRef.current) fileInputRef.current.value = '';
     }, []);
@@ -972,6 +1091,8 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                                         vehicleReg={vehicleReg}
                                         odometerCurrent={odometerCurrent}
                                         odometerPrevious={odometerPrevious}
+                                        useHistoryOdometer={useHistoryOdometer}
+                                        isEditingOdometer={isEditingOdometer}
                                         scanState={scanState}
                                         scanError={scanError}
                                         extractedData={extractedData}
@@ -984,6 +1105,9 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                                         onVehicleRegChange={setVehicleReg}
                                         onOdometerCurrentChange={setOdometerCurrent}
                                         onOdometerPreviousChange={setOdometerPrevious}
+                                        onToggleHistory={handleToggleHistory}
+                                        onStartEdit={handleStartEditOdometer}
+                                        onClearOdometer={handleClearOdometer}
                                         onMarkTouched={markTouched}
                                         onNext={handleNextStep}
                                     />
