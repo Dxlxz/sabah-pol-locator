@@ -42,7 +42,14 @@ function HistoryDetail({ entry, onBack }: { entry: ReceiptHistoryEntry; onBack: 
             <div className="text-xs text-slate-400">
                 {new Date(entry.timestamp).toLocaleString()}
                 {entry.submittedBy !== 'Anonymous' && ` \u2022 ${entry.submittedBy}`}
+                {entry.vehicleReg && ` \u2022 ${entry.vehicleReg}`}
             </div>
+
+            {entry.odometerCurrent != null && (
+                <div className="flex items-center gap-3 text-xs text-slate-500 bg-slate-50/80 rounded-lg px-3 py-2 border border-slate-100/60">
+                    <span className="font-mono font-medium">{entry.odometerCurrent.toLocaleString()} km</span>
+                </div>
+            )}
 
             {extracted && (
                 <div className="bg-slate-50 rounded-xl p-3 space-y-2 border border-slate-100">
@@ -195,7 +202,10 @@ export function ReceiptHistory({ open, onClose }: ReceiptHistoryProps) {
                                                     </span>
                                                     <StatusBadge status={entry.response.status} />
                                                 </div>
-                                                <p className="text-xs text-slate-500 mt-0.5 truncate">{entry.station}</p>
+                                                <p className="text-xs text-slate-500 mt-0.5 truncate">
+                                                    {entry.station}
+                                                    {entry.vehicleReg && <span className="ml-1.5 text-slate-400">&bull; {entry.vehicleReg}</span>}
+                                                </p>
                                                 <p className="text-xs text-slate-400 mt-0.5">
                                                     {new Date(entry.timestamp).toLocaleDateString()} {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                     {entry.response.extractedData?.amount != null && (

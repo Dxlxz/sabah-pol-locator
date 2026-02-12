@@ -1,16 +1,48 @@
-// n8n webhook API wrapper for POL Receipt submission
+// n8n webhook API wrapper for POL Receipt submission (two-phase: scan → confirm)
 
 const WEBHOOK_URL = 'https://n8n2.earthinfo.com.my/webhook/pol-receipt';
 
-export interface ReceiptPayload {
+// --- Scan mode payload (phase 1: OCR only) ---
+export interface ScanPayload {
+    mode: 'scan';
+    image: string; // base64 encoded JPEG
+    station: string;
+    kodLokasi: string;
+    region: string;
+    vehicleReg: string;
+    submittedBy: string;
+    capturedAt: string;
+}
+
+// --- Confirm mode payload (phase 2: save to sheets) ---
+export interface ConfirmedData {
+    receiptNo: string | null;
+    dateOnReceipt: string | null;
+    fuelType: string | null;
+    litres: number | null;
+    amount: number | null;
+    pricePerLitre: number | null;
+    vehicleReg: string;
+    odometerCurrent: number;
+    odometerPrevious: number | null;
+    distance: number | null;
+    fuelEfficiency: number | null;
+}
+
+export interface ConfirmPayload {
+    mode: 'confirm';
     image: string; // base64 encoded JPEG
     station: string;
     kodLokasi: string;
     region: string;
     submittedBy: string;
     capturedAt: string;
+    confirmedData: ConfirmedData;
+    ocrConfidence: string;
+    rawText: string;
 }
 
+// --- Shared response types ---
 export interface ExtractedReceiptData {
     receiptNo: string | null;
     dateOnReceipt: string | null;
@@ -25,19 +57,18 @@ export interface ExtractedReceiptData {
 
 export interface ReceiptResponse {
     success: boolean;
-    status: 'Processed' | 'Review Needed' | 'Error' | 'Rejected';
+    status: 'Processed' | 'Review Needed' | 'Error' | 'Rejected' | 'Scanned';
     receiptNo?: string | null;
     message: string;
     extractedData?: ExtractedReceiptData | null;
     imageUrl?: string | null;
 }
 
-export async function submitReceipt(payload: ReceiptPayload): Promise<ReceiptResponse> {
+// --- Phase 1: Scan receipt (OCR only, no sheet write) ---
+export async function scanReceipt(payload: ScanPayload): Promise<ReceiptResponse> {
     const response = await fetch(WEBHOOK_URL, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
     });
 
@@ -47,14 +78,29 @@ export async function submitReceipt(payload: ReceiptPayload): Promise<ReceiptRes
 
     const data: ReceiptResponse = await response.json();
 
-    // Handle rejected images (not an error — the system worked, image was wrong)
-    if (data.success === false && data.status === 'Rejected') {
-        return data;
+    if (data.success === false && data.status === 'Error') {
+        throw new Error(data.message || 'Receipt scanning failed');
     }
 
-    // Handle workflow-level errors (success: false from error path)
+    return data;
+}
+
+// --- Phase 2: Confirm receipt (upload image + write to sheets) ---
+export async function confirmReceipt(payload: ConfirmPayload): Promise<ReceiptResponse> {
+    const response = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data: ReceiptResponse = await response.json();
+
     if (data.success === false && data.status === 'Error') {
-        throw new Error(data.message || 'Receipt processing failed');
+        throw new Error(data.message || 'Receipt confirmation failed');
     }
 
     return data;
