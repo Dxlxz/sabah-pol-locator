@@ -181,10 +181,12 @@ function StationMarker({
   station,
   isMobile,
   onSelect,
+  onRecordReceipt,
 }: {
   station: Station;
   isMobile: boolean;
   onSelect: (s: Station) => void;
+  onRecordReceipt: (s: Station) => void;
 }) {
   const map = useMap();
 
@@ -216,7 +218,7 @@ function StationMarker({
     >
       {!isMobile && (
         <Popup className="station-popup" minWidth={250} maxWidth={300}>
-          <StationInfo station={station} variant="popup" onRecordReceipt={() => onSelect(station)} />
+          <StationInfo station={station} variant="popup" onRecordReceipt={() => onRecordReceipt(station)} />
         </Popup>
       )}
     </Marker>
@@ -347,6 +349,7 @@ function App() {
                 station={station}
                 isMobile={isMobile}
                 onSelect={isMobile ? setSelectedStation : handleOpenReceipt}
+                onRecordReceipt={handleOpenReceipt}
               />
             ))}
           </MapContainer>
