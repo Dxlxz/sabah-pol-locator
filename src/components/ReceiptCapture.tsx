@@ -22,14 +22,6 @@ interface ReceiptCaptureProps {
 }
 
 export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
-    // Debug: log when component mounts
-    useEffect(() => {
-        console.log('[DEBUG] ReceiptCapture mounted for station:', station.kodLokasi);
-        return () => {
-            console.log('[DEBUG] ReceiptCapture unmounted');
-        };
-    }, [station]);
-
     // --- Image state ---
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [imageBase64, setImageBase64] = useState<string | null>(null);
@@ -225,7 +217,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-sm"
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-sm"
             onClick={(e) => e.target === e.currentTarget && !isLoading && onClose()}
         >
             <motion.div

@@ -223,14 +223,7 @@ function StationMarker({
     >
       {!isMobile && (
         <Popup className="station-popup" minWidth={250} maxWidth={300}>
-          <StationInfo 
-            station={station} 
-            variant="popup" 
-            onRecordReceipt={() => {
-              console.log('[DEBUG] Popup Record Receipt clicked for', station.kodLokasi);
-              onRecordReceipt(station);
-            }} 
-          />
+          <StationInfo station={station} variant="popup" onRecordReceipt={() => onRecordReceipt(station)} />
         </Popup>
       )}
     </Marker>
@@ -299,15 +292,9 @@ function App() {
   const currentBasemap = basemaps.find(b => b.id === activeBasemap) || basemaps[0];
 
   const handleOpenReceipt = useCallback((station: Station) => {
-    console.log('[DEBUG] handleOpenReceipt called with station:', station.kodLokasi);
     setSelectedStation(null);
     setReceiptStation(station);
   }, []);
-
-  // Debug: log when receiptStation changes
-  useEffect(() => {
-    console.log('[DEBUG] receiptStation changed:', receiptStation?.kodLokasi || 'null');
-  }, [receiptStation]);
 
   const handleStationSelect = useCallback((station: Station) => {
     setFlyTarget(station);
