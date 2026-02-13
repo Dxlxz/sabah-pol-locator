@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Camera, X, Loader2, CheckCircle, AlertCircle, User, ExternalLink,
     ChevronDown, Save, Sparkles, ChevronRight, ChevronLeft,
-    Calculator
+    Calculator, Upload, Image
 } from 'lucide-react';
 import type { Station } from '../data/stations';
 import {
@@ -39,7 +39,6 @@ interface Step1Props {
     isLoading: boolean;
     touchedFields: Set<string>;
     fileInputRef: React.RefObject<HTMLInputElement | null>;
-    onImageClick: () => void;
     onRemoveImage: () => void;
     onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
     onVehicleRegChange: (value: string) => void;
@@ -55,13 +54,13 @@ interface Step1Props {
 function Step1Content({
     imagePreview, imageBase64, vehicleReg, odometerCurrent, odometerPrevious,
     useHistoryOdometer, isEditingOdometer, scanState, scanError, extractedData,
-    isLoading, touchedFields, fileInputRef, onImageClick, onRemoveImage,
+    isLoading, touchedFields, fileInputRef, onRemoveImage,
     onFileChange, onVehicleRegChange, onOdometerCurrentChange,
     onOdometerPreviousChange, onToggleHistory, onStartEdit, onClearOdometer,
     onMarkTouched, onNext
 }: Step1Props) {
     const showError = (field: string, condition: boolean) => touchedFields.has(field) && condition;
-    const step1Valid = imageBase64 != null && vehicleReg.trim().length > 0 && odometerCurrent.trim().length > 0 && odometerPrevious.trim().length > 0;
+    const step1Valid = imageBase64 != null && vehicleReg.trim().length > 0 && odometerCurrent.trim().length > 0;
     const distance = parseFloat(odometerCurrent) && parseFloat(odometerPrevious) 
         ? parseFloat(odometerCurrent) - parseFloat(odometerPrevious) 
         : null;
@@ -74,18 +73,39 @@ function Step1Content({
                     Receipt Photo <span className="text-red-500">*</span>
                 </label>
                 {!imagePreview ? (
-                    <button
-                        type="button"
-                        onClick={onImageClick}
-                        disabled={isLoading}
-                        className={`w-full h-40 flex flex-col items-center justify-center gap-3 border-2 border-dashed rounded-xl hover:bg-slate-50 transition-all disabled:opacity-50 ${
-                            showError('image', !imageBase64) ? 'border-red-400 bg-red-50/50' : 'border-slate-300 hover:border-slate-400'
-                        }`}
-                    >
-                        <Camera className="w-10 h-10 text-slate-400" />
-                        <span className="text-sm font-medium text-slate-600">Take Photo of Receipt</span>
-                        <span className="text-xs text-slate-400">Required</span>
-                    </button>
+                    <div className="space-y-3">
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isLoading}
+                            className={`w-full h-32 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl hover:bg-slate-50 transition-all disabled:opacity-50 ${
+                                showError('image', !imageBase64) ? 'border-red-400 bg-red-50/50' : 'border-slate-300 hover:border-slate-400'
+                            }`}
+                        >
+                            <Upload className="w-8 h-8 text-slate-400" />
+                            <span className="text-sm font-medium text-slate-600">Choose from Gallery</span>
+                            <span className="text-xs text-slate-400">or take photo</span>
+                        </button>
+                        
+                        <div className="relative">
+                            <input
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                onChange={onFileChange}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                disabled={isLoading}
+                            />
+                            <button
+                                type="button"
+                                disabled={isLoading}
+                                className="w-full py-3 px-4 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                            >
+                                <Camera className="w-5 h-5" />
+                                Take Photo with Camera
+                            </button>
+                        </div>
+                    </div>
                 ) : (
                     <div className="relative">
                         <img src={imagePreview} alt="Receipt" className="w-full h-48 object-cover rounded-xl border border-slate-200/60" />
@@ -96,6 +116,15 @@ function Step1Content({
                             className="absolute top-2 right-2 p-1.5 bg-white/90 backdrop-blur-sm rounded-lg hover:bg-white transition-colors disabled:opacity-50 shadow-sm"
                         >
                             <X className="w-4 h-4 text-slate-700" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isLoading}
+                            className="absolute bottom-2 right-2 px-3 py-1.5 bg-white/90 backdrop-blur-sm rounded-lg hover:bg-white text-xs font-medium text-slate-700 transition-colors disabled:opacity-50 shadow-sm flex items-center gap-1"
+                        >
+                            <Image className="w-3 h-3" />
+                            Change
                         </button>
                     </div>
                 )}
@@ -133,11 +162,11 @@ function Step1Content({
                     </div>
                 )}
 
+                {/* Hidden file input for gallery */}
                 <input
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"
-                    capture="environment"
                     onChange={onFileChange}
                     className="hidden"
                 />
@@ -186,13 +215,13 @@ function Step1Content({
                 )}
             </div>
 
-            {/* Previous Odometer */}
+            {/* Previous Odometer - OPTIONAL */}
             <div className="space-y-2">
                 <label className="block text-sm font-medium text-slate-700">
-                    Previous Odometer (km) <span className="text-red-500">*</span>
+                    Previous Odometer (km) <span className="text-slate-400 font-normal">(optional)</span>
                 </label>
                 
-                {/* State 1: Using History (Display Mode) */}
+                {/* State 1: Using History (Display Mode) - when history has value */}
                 {useHistoryOdometer && !isEditingOdometer && odometerPrevious && (
                     <div className="p-4 bg-blue-50 border border-blue-200/60 rounded-xl">
                         <div className="flex items-center justify-between mb-2">
@@ -213,7 +242,7 @@ function Step1Content({
                                     onClick={onToggleHistory}
                                     className="px-3 py-1.5 bg-white hover:bg-red-100 text-red-600 text-xs font-medium border border-red-300 rounded-lg transition-colors"
                                 >
-                                    Don't use
+                                    Skip
                                 </button>
                             </div>
                         </div>
@@ -226,28 +255,48 @@ function Step1Content({
                     </div>
                 )}
 
+                {/* State 1b: Using History but no value found */}
+                {useHistoryOdometer && !isEditingOdometer && !odometerPrevious && (
+                    <div className="p-4 bg-slate-50 border border-slate-200/60 rounded-xl">
+                        <p className="text-sm text-slate-600 mb-3">No previous odometer found in history for this vehicle.</p>
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={onStartEdit}
+                                className="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                            >
+                                Enter Manually
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onToggleHistory}
+                                className="flex-1 py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 text-sm font-medium border border-slate-300 rounded-lg transition-colors"
+                            >
+                                Skip
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* State 2: Editing Mode */}
-                {useHistoryOdometer && isEditingOdometer && (
+                {isEditingOdometer && (
                     <div className="space-y-3">
                         <input
                             type="number"
                             inputMode="numeric"
                             value={odometerPrevious}
                             onChange={(e) => onOdometerPreviousChange(e.target.value)}
-                            placeholder="Enter previous odometer"
+                            placeholder="Enter previous odometer (optional)"
                             disabled={isLoading}
                             className="w-full px-4 py-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50"
                         />
                         <div className="flex gap-2">
                             <button
                                 type="button"
-                                onClick={() => {
-                                    onToggleHistory();
-                                    onToggleHistory();
-                                }}
+                                onClick={() => onToggleHistory()}
                                 className="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
                             >
-                                ✓ Use History
+                                {odometerPrevious ? 'Save' : 'Skip'}
                             </button>
                             <button
                                 type="button"
@@ -268,16 +317,11 @@ function Step1Content({
                             inputMode="numeric"
                             value={odometerPrevious}
                             onChange={(e) => onOdometerPreviousChange(e.target.value)}
-                            onBlur={() => onMarkTouched('odometerPrevious')}
-                            placeholder="Enter previous odometer"
+                            placeholder="Enter previous odometer (optional)"
                             disabled={isLoading}
-                            className={`w-full px-4 py-3 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50 ${
-                                showError('odometerPrevious', odometerPrevious.trim().length === 0) ? 'border-red-400' : 'border-slate-300'
-                            }`}
+                            className="w-full px-4 py-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50"
                         />
-                        {showError('odometerPrevious', odometerPrevious.trim().length === 0) && (
-                            <p className="text-xs text-red-600">Previous odometer is required for distance calculation</p>
-                        )}
+                        <p className="text-xs text-slate-500">Leave empty if you don't know the previous reading. Distance won't be calculated.</p>
                         {vehicleReg.trim().length >= 3 && (
                             <button
                                 type="button"
@@ -508,10 +552,16 @@ function Step3Content({
                         <span className="font-medium text-slate-900">{vehicleReg}</span>
                     </div>
                     <div className="flex justify-between">
-                        <span className="text-slate-600">Odometer:</span>
+                        <span className="text-slate-600">Current Odometer:</span>
                         <span className="font-medium text-slate-900">{parseInt(odometerCurrent).toLocaleString()} km</span>
                     </div>
-                    <div className="flex justify-between">
+                    {odometerPrevious && (
+                        <div className="flex justify-between">
+                            <span className="text-slate-600">Previous Odometer:</span>
+                            <span className="font-medium text-slate-900">{parseInt(odometerPrevious).toLocaleString()} km</span>
+                        </div>
+                    )}
+                    <div className="flex justify-between pt-2 border-t border-slate-200/60">
                         <span className="text-slate-600">Fuel:</span>
                         <span className="font-medium text-slate-900">{litres} L @ RM {pricePerLitre?.toFixed(2)}/L</span>
                     </div>
@@ -689,9 +739,6 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
             const prev = getLastOdometerForVehicle(vehicleReg);
             if (prev != null) {
                 setOdometerPrevious(String(prev));
-            } else {
-                // No history found, clear the field
-                setOdometerPrevious('');
             }
         }
     }, [vehicleReg, useHistoryOdometer]);
@@ -771,9 +818,11 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
 
     // Previous Odometer handlers
     const handleToggleHistory = useCallback(() => {
-        setUseHistoryOdometer(prev => !prev);
+        const willUseHistory = !useHistoryOdometer;
+        setUseHistoryOdometer(willUseHistory);
         setIsEditingOdometer(false);
-        if (!useHistoryOdometer) {
+        
+        if (willUseHistory) {
             // Switching to history - reload from history
             const prev = getLastOdometerForVehicle(vehicleReg);
             setOdometerPrevious(prev != null ? String(prev) : '');
@@ -794,7 +843,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
 
     const handleNextStep = useCallback(() => {
         if (currentStep === 1) {
-            ['image', 'vehicleReg', 'odometerCurrent', 'odometerPrevious'].forEach(markTouched);
+            ['image', 'vehicleReg', 'odometerCurrent'].forEach(markTouched);
             if (imageBase64 && vehicleReg.trim() && odometerCurrent.trim()) {
                 setCurrentStep(2);
             }
@@ -1099,7 +1148,6 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                                         isLoading={isLoading}
                                         touchedFields={touchedFields}
                                         fileInputRef={fileInputRef}
-                                        onImageClick={() => fileInputRef.current?.click()}
                                         onRemoveImage={handleRemoveImage}
                                         onFileChange={handleFileChange}
                                         onVehicleRegChange={setVehicleReg}
