@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Camera, X, Loader2, CheckCircle, AlertCircle, User, ExternalLink,
     ChevronDown, Save, Sparkles, ChevronRight, ChevronLeft,
-    Calculator, Upload, Image
+    Calculator, Upload, Image, ScanLine
 } from 'lucide-react';
 import type { Station } from '../data/stations';
 import {
@@ -17,6 +17,7 @@ import {
 
 type Phase = 'idle' | 'submitting' | 'success' | 'error';
 type Step = 1 | 2 | 3;
+type ScanMode = 'pending' | 'scanning' | 'success' | 'error' | 'skipped';
 
 interface ReceiptCaptureProps {
     station: Station;
@@ -33,7 +34,7 @@ interface Step1Props {
     odometerPrevious: string;
     useHistoryOdometer: boolean;
     isEditingOdometer: boolean;
-    scanState: 'idle' | 'scanning' | 'success' | 'error';
+    scanMode: ScanMode;
     scanError: string | null;
     extractedData: ExtractedReceiptData | null;
     isLoading: boolean;
@@ -41,6 +42,8 @@ interface Step1Props {
     fileInputRef: React.RefObject<HTMLInputElement | null>;
     onRemoveImage: () => void;
     onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onStartScan: () => void;
+    onSkipScan: () => void;
     onVehicleRegChange: (value: string) => void;
     onOdometerCurrentChange: (value: string) => void;
     onOdometerPreviousChange: (value: string) => void;
@@ -53,11 +56,11 @@ interface Step1Props {
 
 function Step1Content({
     imagePreview, imageBase64, vehicleReg, odometerCurrent, odometerPrevious,
-    useHistoryOdometer, isEditingOdometer, scanState, scanError, extractedData,
+    useHistoryOdometer, isEditingOdometer, scanMode, scanError, extractedData,
     isLoading, touchedFields, fileInputRef, onRemoveImage,
-    onFileChange, onVehicleRegChange, onOdometerCurrentChange,
-    onOdometerPreviousChange, onToggleHistory, onStartEdit, onClearOdometer,
-    onMarkTouched, onNext
+    onFileChange, onStartScan, onSkipScan, onVehicleRegChange,
+    onOdometerCurrentChange, onOdometerPreviousChange, onToggleHistory,
+    onStartEdit, onClearOdometer, onMarkTouched, onNext
 }: Step1Props) {
     const showError = (field: string, condition: boolean) => touchedFields.has(field) && condition;
     const step1Valid = imageBase64 != null && vehicleReg.trim().length > 0 && odometerCurrent.trim().length > 0;
@@ -130,7 +133,7 @@ function Step1Content({
                 )}
 
                 {/* AI Scan Status */}
-                {scanState === 'scanning' && (
+                {scanMode === 'scanning' && (
                     <div className="mt-3 p-3 bg-blue-50 border border-blue-200/60 rounded-lg">
                         <div className="flex items-center gap-2">
                             <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
@@ -139,7 +142,7 @@ function Step1Content({
                     </div>
                 )}
 
-                {scanState === 'success' && extractedData && (
+                {scanMode === 'success' && extractedData && (
                     <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200/60 rounded-lg">
                         <div className="flex items-center gap-2 mb-1">
                             <CheckCircle className="w-4 h-4 text-emerald-600" />
@@ -153,12 +156,44 @@ function Step1Content({
                     </div>
                 )}
 
-                {scanState === 'error' && (
+                {scanMode === 'error' && (
                     <div className="mt-3 p-3 bg-amber-50 border border-amber-200/60 rounded-lg">
                         <div className="flex items-center gap-2">
                             <AlertCircle className="w-4 h-4 text-amber-600" />
                             <span className="text-sm text-amber-700">{scanError || 'Scan failed - fill manually'}</span>
                         </div>
+                    </div>
+                )}
+
+                {/* Scan Actions - User Choice */}
+                {scanMode === 'pending' && imageBase64 && (
+                    <div className="mt-3 p-4 bg-slate-50 border border-slate-200/60 rounded-xl">
+                        <p className="text-sm text-slate-700 mb-3">Would you like AI to scan this receipt and auto-fill the details?</p>
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={onStartScan}
+                                disabled={isLoading}
+                                className="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                            >
+                                <ScanLine className="w-4 h-4" />
+                                Yes, Scan Now
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onSkipScan}
+                                disabled={isLoading}
+                                className="flex-1 py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 text-sm font-medium border border-slate-300 rounded-lg transition-colors"
+                            >
+                                No, Fill Manually
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {scanMode === 'skipped' && (
+                    <div className="mt-3 p-3 bg-slate-100 border border-slate-200/60 rounded-lg">
+                        <p className="text-sm text-slate-600">AI scan skipped. You can fill in the details manually in the next step.</p>
                     </div>
                 )}
 
@@ -725,7 +760,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
     const [duplicateWarning, setDuplicateWarning] = useState(false);
 
     // --- AI Scan state ---
-    const [scanState, setScanState] = useState<'idle' | 'scanning' | 'success' | 'error'>('idle');
+    const [scanMode, setScanMode] = useState<ScanMode>('pending');
     const [extractedData, setExtractedData] = useState<ExtractedReceiptData | null>(null);
     const [scanError, setScanError] = useState<string | null>(null);
 
@@ -769,8 +804,10 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
             const base64 = await compressImage(file);
             setImageBase64(base64);
             markTouched('image');
-            // Auto-trigger AI scan after image is processed
-            handleScanReceipt(base64);
+            // Reset scan state - now user chooses whether to scan
+            setScanMode('pending');
+            setExtractedData(null);
+            setScanError(null);
         } catch {
             setImagePreview(null);
             setImageBase64(null);
@@ -779,13 +816,15 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
         }
     }, [markTouched]);
 
-    // AI Scan function
-    const handleScanReceipt = useCallback(async (imageBase64Data: string) => {
-        setScanState('scanning');
+    // AI Scan function - triggered by user choice
+    const handleStartScan = useCallback(async () => {
+        if (!imageBase64) return;
+        
+        setScanMode('scanning');
         setScanError(null);
         try {
             const result = await scanReceipt({
-                image: imageBase64Data,
+                image: imageBase64,
                 station: station.name,
                 kodLokasi: station.kodLokasi,
                 region: station.region,
@@ -793,7 +832,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
             
             if (result.success && result.extractedData) {
                 setExtractedData(result.extractedData);
-                setScanState('success');
+                setScanMode('success');
                 // Auto-fill form fields
                 if (result.extractedData.litres) setLitres(String(result.extractedData.litres));
                 if (result.extractedData.amount) setAmount(String(result.extractedData.amount));
@@ -801,18 +840,28 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                 if (result.extractedData.dateOnReceipt) setDateOnReceipt(result.extractedData.dateOnReceipt);
                 if (result.extractedData.fuelType) setFuelType(result.extractedData.fuelType);
             } else {
-                setScanState('error');
+                setScanMode('error');
                 setScanError(result.message || 'Could not read receipt clearly');
             }
         } catch (err) {
-            setScanState('error');
+            setScanMode('error');
             setScanError(err instanceof Error ? err.message : 'AI scan failed');
         }
-    }, [station]);
+    }, [imageBase64, station]);
+
+    // Skip scan - user chooses to fill manually
+    const handleSkipScan = useCallback(() => {
+        setScanMode('skipped');
+        setExtractedData(null);
+        setScanError(null);
+    }, []);
 
     const handleRemoveImage = useCallback(() => {
         setImagePreview(null);
         setImageBase64(null);
+        setScanMode('pending');
+        setExtractedData(null);
+        setScanError(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
     }, []);
 
@@ -971,7 +1020,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
         setTouchedFields(new Set());
         setUseHistoryOdometer(true);
         setIsEditingOdometer(false);
-        setScanState('idle');
+        setScanMode('pending');
         setExtractedData(null);
         setScanError(null);
         submitInFlight.current = false;
@@ -1069,33 +1118,28 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                                     )}
                                     <div className="flex items-center justify-between text-sm pt-2 border-t border-slate-200/60">
                                         <span className="text-slate-600">AI Verification:</span>
-                                        <span className={`text-xs px-2 py-1 rounded-full ${
-                                            receiptResult.aiVerification.status === 'Processing'
-                                                ? 'bg-blue-100 text-blue-700'
-                                                : 'bg-slate-100 text-slate-700'
-                                        }`}>
-                                            {receiptResult.aiVerification.status}
+                                        <span className={`font-medium ${receiptResult.aiVerification?.enabled ? 'text-violet-600' : 'text-slate-400'}`}>
+                                            {receiptResult.aiVerification?.enabled ? 'Enabled' : 'Disabled'}
                                         </span>
                                     </div>
+                                    {receiptResult.imageUrl && (
+                                        <a
+                                            href={receiptResult.imageUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 transition-colors pt-2 border-t border-slate-200/60"
+                                        >
+                                            <ExternalLink className="w-4 h-4" />
+                                            View Receipt Image
+                                        </a>
+                                    )}
                                 </div>
-
-                                {receiptResult.imageUrl && (
-                                    <a
-                                        href={receiptResult.imageUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center justify-center gap-2 py-2 text-sm text-blue-600 hover:text-blue-700 transition-colors"
-                                    >
-                                        <ExternalLink className="w-4 h-4" />
-                                        View Image
-                                    </a>
-                                )}
 
                                 <button
                                     onClick={handleReset}
-                                    className="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-xl transition-colors"
+                                    className="w-full py-3.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-xl transition-colors"
                                 >
-                                    Record Another
+                                    Record Another Receipt
                                 </button>
                             </motion.div>
                         )}
@@ -1109,23 +1153,23 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                                 exit={{ opacity: 0, y: -20 }}
                                 className="space-y-4"
                             >
-                                <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200/60 rounded-xl">
-                                    <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+                                <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200/60 rounded-xl">
+                                    <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
                                     <div className="flex-1">
-                                        <p className="font-medium text-red-900">Submission Failed</p>
-                                        <p className="text-sm text-red-700 mt-1">{resultMessage}</p>
+                                        <p className="font-medium text-red-900">Error</p>
+                                        <p className="text-sm text-red-700">{resultMessage}</p>
                                     </div>
                                 </div>
                                 <button
                                     onClick={handleReset}
-                                    className="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-xl transition-colors"
+                                    className="w-full py-3.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-xl transition-colors"
                                 >
                                     Try Again
                                 </button>
                             </motion.div>
                         )}
 
-                        {/* Form Steps */}
+                        {/* Idle Phase - Step Wizard */}
                         {phase === 'idle' && (
                             <motion.div
                                 key={`step-${currentStep}`}
@@ -1142,7 +1186,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                                         odometerPrevious={odometerPrevious}
                                         useHistoryOdometer={useHistoryOdometer}
                                         isEditingOdometer={isEditingOdometer}
-                                        scanState={scanState}
+                                        scanMode={scanMode}
                                         scanError={scanError}
                                         extractedData={extractedData}
                                         isLoading={isLoading}
@@ -1150,6 +1194,8 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                                         fileInputRef={fileInputRef}
                                         onRemoveImage={handleRemoveImage}
                                         onFileChange={handleFileChange}
+                                        onStartScan={handleStartScan}
+                                        onSkipScan={handleSkipScan}
                                         onVehicleRegChange={setVehicleReg}
                                         onOdometerCurrentChange={setOdometerCurrent}
                                         onOdometerPreviousChange={setOdometerPrevious}
@@ -1160,6 +1206,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                                         onNext={handleNextStep}
                                     />
                                 )}
+
                                 {currentStep === 2 && (
                                     <Step2Content
                                         litres={litres}
@@ -1180,6 +1227,7 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                                         onBack={handlePrevStep}
                                     />
                                 )}
+
                                 {currentStep === 3 && (
                                     <Step3Content
                                         vehicleReg={vehicleReg}
@@ -1200,20 +1248,6 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                                         onCancelDuplicate={() => setDuplicateWarning(false)}
                                     />
                                 )}
-                            </motion.div>
-                        )}
-
-                        {/* Submitting */}
-                        {phase === 'submitting' && (
-                            <motion.div
-                                key="submitting"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                className="flex flex-col items-center justify-center py-12"
-                            >
-                                <Loader2 className="w-12 h-12 text-slate-900 animate-spin mb-4" />
-                                <p className="text-lg font-medium text-slate-900">Saving Receipt...</p>
-                                <p className="text-sm text-slate-600">Uploading to Google Drive and Sheets</p>
                             </motion.div>
                         )}
                     </AnimatePresence>
