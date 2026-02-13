@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Camera, X, Loader2, CheckCircle, AlertCircle, User, ExternalLink,
-    ChevronDown, Save, Sparkles, ChevronRight, ChevronLeft,
-    Calculator, Upload, Image, ScanLine
+    Camera, X, Loader2, CheckCircle, AlertCircle, ExternalLink,
+    ChevronRight, Save, Sparkles, Upload, ScanLine
 } from 'lucide-react';
 import type { Station } from '../data/stations';
 import {
@@ -49,7 +48,6 @@ interface Step1Props {
     onOdometerPreviousChange: (value: string) => void;
     onToggleHistory: () => void;
     onStartEdit: () => void;
-    onClearOdometer: () => void;
     onMarkTouched: (field: string) => void;
     onNext: () => void;
 }
@@ -60,36 +58,31 @@ function Step1Content({
     isLoading, touchedFields, fileInputRef, onRemoveImage,
     onFileChange, onStartScan, onSkipScan, onVehicleRegChange,
     onOdometerCurrentChange, onOdometerPreviousChange, onToggleHistory,
-    onStartEdit, onClearOdometer, onMarkTouched, onNext
+    onStartEdit, onMarkTouched, onNext
 }: Step1Props) {
     const showError = (field: string, condition: boolean) => touchedFields.has(field) && condition;
     const step1Valid = imageBase64 != null && vehicleReg.trim().length > 0 && odometerCurrent.trim().length > 0;
-    const distance = parseFloat(odometerCurrent) && parseFloat(odometerPrevious) 
-        ? parseFloat(odometerCurrent) - parseFloat(odometerPrevious) 
-        : null;
 
     return (
-        <div className="space-y-6">
-            {/* Photo Capture */}
+        <div className="space-y-4">
+            {/* Photo Capture - Compact */}
             <div className="space-y-2">
                 <label className="block text-sm font-medium text-slate-700">
                     Receipt Photo <span className="text-red-500">*</span>
                 </label>
                 {!imagePreview ? (
-                    <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
                         <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isLoading}
-                            className={`w-full h-32 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl hover:bg-slate-50 transition-all disabled:opacity-50 ${
+                            className={`h-24 flex flex-col items-center justify-center gap-1 border-2 border-dashed rounded-lg hover:bg-slate-50 transition-all disabled:opacity-50 ${
                                 showError('image', !imageBase64) ? 'border-red-400 bg-red-50/50' : 'border-slate-300 hover:border-slate-400'
                             }`}
                         >
-                            <Upload className="w-8 h-8 text-slate-400" />
-                            <span className="text-sm font-medium text-slate-600">Choose from Gallery</span>
-                            <span className="text-xs text-slate-400">or take photo</span>
+                            <Upload className="w-6 h-6 text-slate-400" />
+                            <span className="text-xs font-medium text-slate-600">Gallery</span>
                         </button>
-                        
                         <div className="relative">
                             <input
                                 type="file"
@@ -102,128 +95,91 @@ function Step1Content({
                             <button
                                 type="button"
                                 disabled={isLoading}
-                                className="w-full py-3 px-4 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                                className="w-full h-24 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors flex flex-col items-center gap-1 disabled:opacity-50"
                             >
-                                <Camera className="w-5 h-5" />
-                                Take Photo with Camera
+                                <Camera className="w-6 h-6" />
+                                <span className="text-xs">Camera</span>
                             </button>
                         </div>
                     </div>
                 ) : (
                     <div className="relative">
-                        <img src={imagePreview} alt="Receipt" className="w-full h-48 object-cover rounded-xl border border-slate-200/60" />
+                        <img src={imagePreview} alt="Receipt" className="w-full h-36 object-cover rounded-lg border border-slate-200/60" />
                         <button
                             type="button"
                             onClick={onRemoveImage}
                             disabled={isLoading}
-                            className="absolute top-2 right-2 p-1.5 bg-white/90 backdrop-blur-sm rounded-lg hover:bg-white transition-colors disabled:opacity-50 shadow-sm"
+                            className="absolute top-2 right-2 p-1.5 bg-white/90 rounded-lg hover:bg-white transition-colors disabled:opacity-50 shadow-sm"
                         >
                             <X className="w-4 h-4 text-slate-700" />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={isLoading}
-                            className="absolute bottom-2 right-2 px-3 py-1.5 bg-white/90 backdrop-blur-sm rounded-lg hover:bg-white text-xs font-medium text-slate-700 transition-colors disabled:opacity-50 shadow-sm flex items-center gap-1"
-                        >
-                            <Image className="w-3 h-3" />
-                            Change
                         </button>
                     </div>
                 )}
 
-                {/* AI Scan Status */}
+                {/* AI Scan Status - Compact */}
                 {scanMode === 'scanning' && (
-                    <div className="mt-3 p-3 bg-blue-50 border border-blue-200/60 rounded-lg">
-                        <div className="flex items-center gap-2">
-                            <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-                            <span className="text-sm text-blue-700">AI scanning receipt...</span>
-                        </div>
+                    <div className="p-3 bg-blue-50 border border-blue-200/60 rounded-lg flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                        <span className="text-sm text-blue-700">AI scanning receipt...</span>
                     </div>
                 )}
 
                 {scanMode === 'success' && extractedData && (
-                    <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200/60 rounded-lg">
-                        <div className="flex items-center gap-2 mb-1">
-                            <CheckCircle className="w-4 h-4 text-emerald-600" />
-                            <span className="text-sm font-medium text-emerald-700">Receipt scanned!</span>
-                        </div>
-                        <div className="text-xs text-emerald-600">
-                            {extractedData.litres && <span>{extractedData.litres}L </span>}
-                            {extractedData.amount && <span>RM{extractedData.amount} </span>}
-                            {extractedData.fuelType && <span>• {extractedData.fuelType}</span>}
+                    <div className="p-3 bg-emerald-50 border border-emerald-200/60 rounded-lg flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-emerald-600" />
+                        <div className="flex-1">
+                            <span className="text-sm font-medium text-emerald-700">Scanned!</span>
+                            <span className="text-xs text-emerald-600 ml-2">
+                                {extractedData.litres && `${extractedData.litres}L `}
+                                {extractedData.amount && `RM${extractedData.amount} `}
+                                {extractedData.fuelType && `• ${extractedData.fuelType}`}
+                            </span>
                         </div>
                     </div>
                 )}
 
                 {scanMode === 'error' && (
-                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200/60 rounded-lg">
-                        <div className="flex items-center gap-2">
-                            <AlertCircle className="w-4 h-4 text-amber-600" />
-                            <span className="text-sm text-amber-700">{scanError || 'Scan failed - fill manually'}</span>
-                        </div>
+                    <div className="p-3 bg-amber-50 border border-amber-200/60 rounded-lg flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-amber-600" />
+                        <span className="text-sm text-amber-700">{scanError || 'Scan failed'}</span>
                     </div>
                 )}
 
-                {/* AI Scan Choice - Two Clear Buttons */}
+                {/* AI Scan Choice - Clean Two Buttons */}
                 {scanMode === 'pending' && imageBase64 && (
-                    <div className="mt-4 p-5 bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-200/60 rounded-xl">
-                        <div className="text-center mb-4">
-                            <div className="inline-flex items-center justify-center w-12 h-12 bg-violet-100 rounded-full mb-3">
-                                <Sparkles className="w-6 h-6 text-violet-600" />
-                            </div>
-                            <p className="font-medium text-slate-800">AI Receipt Scanner</p>
-                            <p className="text-sm text-slate-600 mt-1">Automatically extract fuel details from your receipt photo</p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
+                    <div className="p-4 bg-violet-50 border border-violet-200/60 rounded-lg">
+                        <p className="text-sm font-medium text-slate-700 mb-3">Auto-fill receipt details with AI?</p>
+                        <div className="grid grid-cols-2 gap-2">
                             <button
                                 type="button"
                                 onClick={onStartScan}
                                 disabled={isLoading}
-                                className="py-3 px-4 bg-violet-600 hover:bg-violet-700 text-white font-medium rounded-xl transition-colors flex flex-col items-center gap-1 disabled:opacity-50 shadow-sm hover:shadow-md"
+                                className="py-2.5 px-3 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                             >
-                                <ScanLine className="w-5 h-5" />
-                                <span>Scan Receipt</span>
-                                <span className="text-xs text-violet-200 font-normal">Auto-fill details</span>
+                                <ScanLine className="w-4 h-4" />
+                                Yes, Scan
                             </button>
                             <button
                                 type="button"
                                 onClick={onSkipScan}
                                 disabled={isLoading}
-                                className="py-3 px-4 bg-white hover:bg-slate-100 text-slate-700 font-medium border border-slate-300 rounded-xl transition-colors flex flex-col items-center gap-1"
+                                className="py-2.5 px-3 bg-white hover:bg-slate-100 text-slate-700 text-sm font-medium border border-slate-300 rounded-lg transition-colors"
                             >
-                                <Calculator className="w-5 h-5 text-slate-400" />
-                                <span>Fill Manual</span>
-                                <span className="text-xs text-slate-400 font-normal">Enter details yourself</span>
+                                No, Manual
                             </button>
                         </div>
                     </div>
                 )}
 
                 {scanMode === 'skipped' && (
-                    <div className="mt-4 p-4 bg-slate-100 border border-slate-200/60 rounded-xl">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center">
-                                    <Calculator className="w-4 h-4 text-slate-500" />
-                                </div>
-                                <div>
-                                    <p className="text-sm font-medium text-slate-700">Manual Entry Mode</p>
-                                    <p className="text-xs text-slate-500">You'll enter fuel details yourself</p>
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={onStartScan}
-                                className="text-sm text-violet-600 hover:text-violet-700 font-medium"
-                            >
-                                Switch to AI
-                            </button>
-                        </div>
+                    <div className="p-3 bg-slate-100 border border-slate-200/60 rounded-lg flex items-center justify-between">
+                        <span className="text-sm text-slate-600">Manual entry mode</span>
+                        <button type="button" onClick={onStartScan} className="text-sm text-violet-600 font-medium">
+                            Use AI
+                        </button>
                     </div>
                 )}
 
-                {/* Hidden file input for gallery */}
                 <input
                     ref={fileInputRef}
                     type="file"
@@ -234,28 +190,25 @@ function Step1Content({
             </div>
 
             {/* Vehicle Registration */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
                 <label className="block text-sm font-medium text-slate-700">
-                    Vehicle Registration <span className="text-red-500">*</span>
+                    Vehicle <span className="text-red-500">*</span>
                 </label>
                 <input
                     type="text"
                     value={vehicleReg}
                     onChange={(e) => onVehicleRegChange(e.target.value.toUpperCase())}
                     onBlur={() => onMarkTouched('vehicleReg')}
-                    placeholder="e.g., SAB 1234"
+                    placeholder="SAB 1234"
                     disabled={isLoading}
-                    className={`w-full px-4 py-3 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50 ${
+                    className={`w-full px-3 py-2.5 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 ${
                         showError('vehicleReg', vehicleReg.trim().length === 0) ? 'border-red-400' : 'border-slate-300'
                     }`}
                 />
-                {showError('vehicleReg', vehicleReg.trim().length === 0) && (
-                    <p className="text-xs text-red-600">Please enter vehicle registration</p>
-                )}
             </div>
 
             {/* Current Odometer */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
                 <label className="block text-sm font-medium text-slate-700">
                     Current Odometer (km) <span className="text-red-500">*</span>
                 </label>
@@ -265,145 +218,77 @@ function Step1Content({
                     value={odometerCurrent}
                     onChange={(e) => onOdometerCurrentChange(e.target.value)}
                     onBlur={() => onMarkTouched('odometerCurrent')}
-                    placeholder="e.g., 45230"
+                    placeholder="45230"
                     disabled={isLoading}
-                    className={`w-full px-4 py-3 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50 ${
+                    className={`w-full px-3 py-2.5 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 ${
                         showError('odometerCurrent', odometerCurrent.trim().length === 0) ? 'border-red-400' : 'border-slate-300'
                     }`}
                 />
-                {showError('odometerCurrent', odometerCurrent.trim().length === 0) && (
-                    <p className="text-xs text-red-600">Please enter current odometer reading</p>
-                )}
             </div>
 
-            {/* Previous Odometer - OPTIONAL */}
-            <div className="space-y-2">
+            {/* Previous Odometer - Compact */}
+            <div className="space-y-1.5">
                 <label className="block text-sm font-medium text-slate-700">
-                    Previous Odometer (km) <span className="text-slate-400 font-normal">(optional)</span>
+                    Previous Odometer <span className="text-slate-400 font-normal">(optional)</span>
                 </label>
                 
-                {/* State 1: Using History (Display Mode) - when history has value */}
                 {useHistoryOdometer && !isEditingOdometer && odometerPrevious && (
-                    <div className="p-4 bg-blue-50 border border-blue-200/60 rounded-xl">
-                        <div className="flex items-center justify-between mb-2">
-                            <div>
-                                <span className="text-2xl font-bold text-blue-900">{parseInt(odometerPrevious).toLocaleString()} km</span>
-                                <p className="text-xs text-blue-700">From history</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={onStartEdit}
-                                    className="px-3 py-1.5 bg-white hover:bg-blue-100 text-blue-700 text-xs font-medium border border-blue-300 rounded-lg transition-colors"
-                                >
-                                    Change
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={onToggleHistory}
-                                    className="px-3 py-1.5 bg-white hover:bg-red-100 text-red-600 text-xs font-medium border border-red-300 rounded-lg transition-colors"
-                                >
-                                    Skip
-                                </button>
-                            </div>
+                    <div className="p-3 bg-blue-50 border border-blue-200/60 rounded-lg flex items-center justify-between">
+                        <div>
+                            <span className="text-lg font-bold text-blue-900">{parseInt(odometerPrevious).toLocaleString()}</span>
+                            <span className="text-xs text-blue-600 ml-1">km</span>
                         </div>
-                        {distance != null && distance > 0 && (
-                            <div className="pt-2 border-t border-blue-200/60 flex items-center justify-between text-sm">
-                                <span className="text-blue-700">Distance traveled:</span>
-                                <span className="font-semibold text-blue-900">{Math.round(distance)} km</span>
-                            </div>
-                        )}
+                        <div className="flex gap-2">
+                            <button type="button" onClick={onStartEdit} className="text-xs text-blue-700 font-medium">Edit</button>
+                            <button type="button" onClick={onToggleHistory} className="text-xs text-red-600 font-medium">Skip</button>
+                        </div>
                     </div>
                 )}
 
-                {/* State 1b: Using History but no value found */}
                 {useHistoryOdometer && !isEditingOdometer && !odometerPrevious && (
-                    <div className="p-4 bg-slate-50 border border-slate-200/60 rounded-xl">
-                        <p className="text-sm text-slate-600 mb-3">No previous odometer found in history for this vehicle.</p>
-                        <div className="flex gap-2">
-                            <button
-                                type="button"
-                                onClick={onStartEdit}
-                                className="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-                            >
-                                Enter Manually
-                            </button>
-                            <button
-                                type="button"
-                                onClick={onToggleHistory}
-                                className="flex-1 py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 text-sm font-medium border border-slate-300 rounded-lg transition-colors"
-                            >
-                                Skip
-                            </button>
-                        </div>
+                    <div className="flex gap-2">
+                        <button type="button" onClick={onStartEdit} className="flex-1 py-2 text-sm bg-blue-600 text-white rounded-lg">Enter</button>
+                        <button type="button" onClick={onToggleHistory} className="flex-1 py-2 text-sm bg-slate-200 text-slate-700 rounded-lg">Skip</button>
                     </div>
                 )}
 
-                {/* State 2: Editing Mode */}
                 {isEditingOdometer && (
-                    <div className="space-y-3">
-                        <input
-                            type="number"
-                            inputMode="numeric"
-                            value={odometerPrevious}
-                            onChange={(e) => onOdometerPreviousChange(e.target.value)}
-                            placeholder="Enter previous odometer (optional)"
-                            disabled={isLoading}
-                            className="w-full px-4 py-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50"
-                        />
-                        <div className="flex gap-2">
-                            <button
-                                type="button"
-                                onClick={() => onToggleHistory()}
-                                className="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-                            >
-                                {odometerPrevious ? 'Save' : 'Skip'}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={onClearOdometer}
-                                className="flex-1 py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 text-sm font-medium border border-slate-300 rounded-lg transition-colors"
-                            >
-                                Clear
-                            </button>
-                        </div>
-                    </div>
+                    <input
+                        type="number"
+                        inputMode="numeric"
+                        value={odometerPrevious}
+                        onChange={(e) => onOdometerPreviousChange(e.target.value)}
+                        placeholder="Previous reading"
+                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
                 )}
 
-                {/* State 3: Not Using History (Manual Entry) */}
                 {!useHistoryOdometer && (
-                    <div className="space-y-3">
+                    <div>
                         <input
                             type="number"
                             inputMode="numeric"
                             value={odometerPrevious}
                             onChange={(e) => onOdometerPreviousChange(e.target.value)}
-                            placeholder="Enter previous odometer (optional)"
+                            placeholder="Optional"
                             disabled={isLoading}
-                            className="w-full px-4 py-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50"
+                            className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         />
-                        <p className="text-xs text-slate-500">Leave empty if you don't know the previous reading. Distance won't be calculated.</p>
                         {vehicleReg.trim().length >= 3 && (
-                            <button
-                                type="button"
-                                onClick={onToggleHistory}
-                                className="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-                            >
-                                <span>🔍</span> Lookup from History
-                            </button>
+                            <button type="button" onClick={onToggleHistory} className="mt-2 text-xs text-blue-600 font-medium">🔍 Lookup from history</button>
                         )}
                     </div>
                 )}
             </div>
 
-            {/* Navigation */}
+            {/* Next Button */}
             <button
                 onClick={onNext}
                 disabled={!step1Valid}
-                className="w-full py-3.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-                Next: Fuel Details
-                <ChevronRight className="w-5 h-5" />
+                Next
+                <ChevronRight className="w-4 h-4" />
             </button>
         </div>
     );
@@ -439,13 +324,11 @@ function Step2Content({
     const step2Valid = litresNum != null && litresNum > 0 && amountNum != null && amountNum > 0;
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             {/* Litres & Amount */}
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <label className="block text-sm font-medium text-slate-700">
-                        Litres <span className="text-red-500">*</span>
-                    </label>
+            <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-slate-700">Litres <span className="text-red-500">*</span></label>
                     <input
                         type="number"
                         inputMode="decimal"
@@ -453,17 +336,15 @@ function Step2Content({
                         value={litres}
                         onChange={(e) => onLitresChange(e.target.value)}
                         onBlur={() => onMarkTouched('litres')}
-                        placeholder="45.5"
+                        placeholder="0.00"
                         disabled={isLoading}
-                        className={`w-full px-4 py-3 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50 ${
+                        className={`w-full px-3 py-2.5 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                             showError('litres', litresNum == null || litresNum <= 0) ? 'border-red-400' : 'border-slate-300'
                         }`}
                     />
                 </div>
-                <div className="space-y-2">
-                    <label className="block text-sm font-medium text-slate-700">
-                        Amount (MYR) <span className="text-red-500">*</span>
-                    </label>
+                <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-slate-700">Amount (MYR) <span className="text-red-500">*</span></label>
                     <input
                         type="number"
                         inputMode="decimal"
@@ -471,9 +352,9 @@ function Step2Content({
                         value={amount}
                         onChange={(e) => onAmountChange(e.target.value)}
                         onBlur={() => onMarkTouched('amount')}
-                        placeholder="125.50"
+                        placeholder="0.00"
                         disabled={isLoading}
-                        className={`w-full px-4 py-3 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50 ${
+                        className={`w-full px-3 py-2.5 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                             showError('amount', amountNum == null || amountNum <= 0) ? 'border-red-400' : 'border-slate-300'
                         }`}
                     />
@@ -482,82 +363,66 @@ function Step2Content({
 
             {/* Auto-calculated Price per Litre */}
             {pricePerLitre != null && (
-                <div className="p-4 bg-emerald-50 border border-emerald-200/60 rounded-xl">
-                    <div className="flex items-center gap-2 mb-2">
-                        <Calculator className="w-4 h-4 text-emerald-600" />
-                        <span className="text-sm font-medium text-emerald-900">Auto-calculated</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <span className="text-emerald-700">Price per Litre:</span>
-                        <span className="text-2xl font-bold text-emerald-900">RM {pricePerLitre.toFixed(2)}</span>
-                    </div>
+                <div className="p-3 bg-emerald-50 border border-emerald-200/60 rounded-lg flex items-center justify-between">
+                    <span className="text-sm text-emerald-700">Price/Litre</span>
+                    <span className="text-lg font-bold text-emerald-900">RM {pricePerLitre.toFixed(2)}</span>
                 </div>
             )}
 
-            {/* Receipt Details Header */}
-            <div className="pt-2 border-t border-slate-200/60">
-                <h3 className="text-sm font-semibold text-slate-900 mb-4">Additional Details (Optional)</h3>
-                
-                <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="block text-sm font-medium text-slate-700">Receipt No</label>
-                            <input
-                                type="text"
-                                value={receiptNo}
-                                onChange={(e) => onReceiptNoChange(e.target.value)}
-                                placeholder="REC-001"
-                                disabled={isLoading}
-                                className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="block text-sm font-medium text-slate-700">Date</label>
-                            <input
-                                type="date"
-                                value={dateOnReceipt}
-                                onChange={(e) => onDateChange(e.target.value)}
-                                disabled={isLoading}
-                                className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50"
-                            />
-                        </div>
+            {/* Optional Fields - Compact */}
+            <div className="space-y-3 pt-2 border-t border-slate-200">
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                        <label className="block text-xs font-medium text-slate-600">Receipt No</label>
+                        <input
+                            type="text"
+                            value={receiptNo}
+                            onChange={(e) => onReceiptNoChange(e.target.value)}
+                            placeholder="Optional"
+                            disabled={isLoading}
+                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        />
                     </div>
-
-                    <div className="space-y-2">
-                        <label className="block text-sm font-medium text-slate-700">Fuel Type</label>
-                        <div className="relative">
-                            <select
-                                value={fuelType}
-                                onChange={(e) => onFuelTypeChange(e.target.value)}
-                                disabled={isLoading}
-                                className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50 appearance-none"
-                            >
-                                <option value="Petrol">Petrol</option>
-                                <option value="Diesel">Diesel</option>
-                                <option value="Other">Other</option>
-                            </select>
-                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-                        </div>
+                    <div className="space-y-1.5">
+                        <label className="block text-xs font-medium text-slate-600">Date</label>
+                        <input
+                            type="date"
+                            value={dateOnReceipt}
+                            onChange={(e) => onDateChange(e.target.value)}
+                            disabled={isLoading}
+                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        />
                     </div>
+                </div>
+                <div className="space-y-1.5">
+                    <label className="block text-xs font-medium text-slate-600">Fuel Type</label>
+                    <select
+                        value={fuelType}
+                        onChange={(e) => onFuelTypeChange(e.target.value)}
+                        disabled={isLoading}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="Petrol">Petrol</option>
+                        <option value="Diesel">Diesel</option>
+                        <option value="Other">Other</option>
+                    </select>
                 </div>
             </div>
 
             {/* Navigation */}
-            <div className="flex gap-3">
+            <div className="flex gap-2 pt-2">
                 <button
                     onClick={onBack}
-                    className="flex-1 py-3.5 px-4 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                    className="flex-1 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium rounded-lg transition-colors"
                 >
-                    <ChevronLeft className="w-5 h-5" />
                     Back
                 </button>
                 <button
                     onClick={onNext}
                     disabled={!step2Valid}
-                    className="flex-1 py-3.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
                 >
-                    Next: Review
-                    <ChevronRight className="w-5 h-5" />
+                    Review
                 </button>
             </div>
         </div>
@@ -575,7 +440,6 @@ interface Step3Props {
     enableAI: boolean;
     isLoading: boolean;
     duplicateWarning: boolean;
-    stationName: string;
     onSubmittedByChange: (value: string) => void;
     onEnableAIChange: () => void;
     onSubmit: () => void;
@@ -586,7 +450,7 @@ interface Step3Props {
 function Step3Content({
     vehicleReg, odometerCurrent, odometerPrevious, litres, amount, pricePerLitre,
     submittedBy, enableAI, isLoading,
-    duplicateWarning, stationName, onSubmittedByChange, onEnableAIChange,
+    duplicateWarning, onSubmittedByChange, onEnableAIChange,
     onSubmit, onBack, onCancelDuplicate
 }: Step3Props) {
     const odomCurrent = parseFloat(odometerCurrent) || null;
@@ -595,152 +459,103 @@ function Step3Content({
         ? odomCurrent - odomPrevious
         : null;
     const litresNum = parseFloat(litres) || null;
-    const fuelEfficiency = distance != null && litresNum != null && litresNum > 0
-        ? distance / litresNum
-        : null;
     const canSubmit = vehicleReg.trim().length > 0 && odometerCurrent.trim().length > 0 &&
                        litresNum != null && litresNum > 0 && parseFloat(amount) > 0;
 
     return (
-        <div className="space-y-6">
-            {/* Summary Card */}
-            <div className="p-4 bg-slate-50 border border-slate-200/60 rounded-xl space-y-3">
-                <h3 className="font-semibold text-slate-900">Receipt Summary</h3>
-                
-                <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                        <span className="text-slate-600">Vehicle:</span>
-                        <span className="font-medium text-slate-900">{vehicleReg}</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span className="text-slate-600">Current Odometer:</span>
-                        <span className="font-medium text-slate-900">{parseInt(odometerCurrent).toLocaleString()} km</span>
-                    </div>
-                    {odometerPrevious && (
-                        <div className="flex justify-between">
-                            <span className="text-slate-600">Previous Odometer:</span>
-                            <span className="font-medium text-slate-900">{parseInt(odometerPrevious).toLocaleString()} km</span>
-                        </div>
-                    )}
-                    <div className="flex justify-between pt-2 border-t border-slate-200/60">
-                        <span className="text-slate-600">Fuel:</span>
-                        <span className="font-medium text-slate-900">{litres} L @ RM {pricePerLitre?.toFixed(2)}/L</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span className="text-slate-600">Total:</span>
-                        <span className="font-bold text-slate-900">RM {parseFloat(amount).toFixed(2)}</span>
-                    </div>
-                    {distance != null && (
-                        <div className="flex justify-between pt-2 border-t border-slate-200/60">
-                            <span className="text-slate-600">Distance:</span>
-                            <span className="font-medium text-slate-900">{distance.toFixed(0)} km</span>
-                        </div>
-                    )}
-                    {fuelEfficiency != null && (
-                        <div className="flex justify-between">
-                            <span className="text-slate-600">Efficiency:</span>
-                            <span className="font-medium text-slate-900">{fuelEfficiency.toFixed(2)} km/L</span>
-                        </div>
-                    )}
+        <div className="space-y-4">
+            {/* Summary Card - Compact */}
+            <div className="p-4 bg-slate-50 border border-slate-200/60 rounded-lg space-y-2 text-sm">
+                <div className="flex justify-between">
+                    <span className="text-slate-600">Vehicle</span>
+                    <span className="font-medium">{vehicleReg}</span>
                 </div>
+                <div className="flex justify-between">
+                    <span className="text-slate-600">Odometer</span>
+                    <span className="font-medium">{parseInt(odometerCurrent).toLocaleString()} km</span>
+                </div>
+                <div className="flex justify-between">
+                    <span className="text-slate-600">Fuel</span>
+                    <span className="font-medium">{litres} L @ RM{pricePerLitre?.toFixed(2)}/L</span>
+                </div>
+                <div className="flex justify-between font-bold border-t border-slate-200 pt-2">
+                    <span>Total</span>
+                    <span>RM {parseFloat(amount).toFixed(2)}</span>
+                </div>
+                {distance != null && (
+                    <div className="flex justify-between text-xs text-slate-500">
+                        <span>Distance</span>
+                        <span>{distance.toFixed(0)} km</span>
+                    </div>
+                )}
             </div>
 
-            {/* Submitted By */}
-            <div className="space-y-2">
-                <label className="block text-sm font-medium text-slate-700 flex items-center gap-2">
-                    <User className="w-4 h-4" />
-                    Your Name (optional)
-                </label>
+            {/* Your Name */}
+            <div className="space-y-1.5">
+                <label className="block text-sm font-medium text-slate-700">Your Name (optional)</label>
                 <input
                     type="text"
                     value={submittedBy}
                     onChange={(e) => onSubmittedByChange(e.target.value)}
                     placeholder="Anonymous"
                     disabled={isLoading}
-                    className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-slate-50"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
             </div>
 
-            {/* AI Verification */}
-            <div className="p-4 bg-violet-50 border border-violet-200/60 rounded-xl">
-                <div className="flex items-start gap-3">
-                    <Sparkles className="w-5 h-5 text-violet-600 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                        <div className="flex items-center justify-between mb-2">
-                            <div>
-                                <p className="font-medium text-slate-900">AI Verification</p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={onEnableAIChange}
-                                disabled={isLoading}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 disabled:opacity-50 ${
-                                    enableAI ? 'bg-violet-600' : 'bg-slate-300'
-                                }`}
-                            >
-                                <span
-                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                        enableAI ? 'translate-x-6' : 'translate-x-1'
-                                    }`}
-                                />
-                            </button>
-                        </div>
-                        <p className="text-sm text-slate-600">
-                            {enableAI 
-                                ? "AI will verify your receipt data against the photo in the background. You'll receive a notification if any discrepancies are found."
-                                : "AI verification is disabled. Only manual data will be saved."
-                            }
-                        </p>
-                    </div>
+            {/* AI Verification Toggle */}
+            <div className="p-3 bg-violet-50 border border-violet-200/60 rounded-lg flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-violet-600" />
+                    <span className="text-sm font-medium text-slate-700">AI Verify</span>
                 </div>
+                <button
+                    type="button"
+                    onClick={onEnableAIChange}
+                    disabled={isLoading}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        enableAI ? 'bg-violet-600' : 'bg-slate-300'
+                    }`}
+                >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        enableAI ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                </button>
             </div>
 
             {/* Duplicate Warning */}
             {duplicateWarning && (
-                <div className="p-4 bg-amber-50 border border-amber-200/60 rounded-xl">
-                    <p className="text-sm text-amber-800 mb-3">
-                        You submitted a receipt for {stationName} less than 5 minutes ago. Continue?
-                    </p>
+                <div className="p-3 bg-amber-50 border border-amber-200/60 rounded-lg">
+                    <p className="text-sm text-amber-800 mb-2">Submitted recently. Continue?</p>
                     <div className="flex gap-2">
-                        <button
-                            onClick={() => onSubmit()}
-                            className="flex-1 py-2 px-4 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg transition-colors"
-                        >
-                            Yes, Continue
-                        </button>
-                        <button
-                            onClick={onCancelDuplicate}
-                            className="flex-1 py-2 px-4 bg-white hover:bg-slate-50 text-slate-700 font-medium border border-slate-300 rounded-lg transition-colors"
-                        >
-                            Cancel
-                        </button>
+                        <button onClick={() => onSubmit()} className="flex-1 py-2 text-sm bg-amber-600 text-white rounded-lg">Yes</button>
+                        <button onClick={onCancelDuplicate} className="flex-1 py-2 text-sm bg-white border border-slate-300 rounded-lg">Cancel</button>
                     </div>
                 </div>
             )}
 
             {/* Navigation */}
-            <div className="flex gap-3">
+            <div className="flex gap-2 pt-2">
                 <button
                     onClick={onBack}
-                    className="flex-1 py-3.5 px-4 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                    className="flex-1 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium rounded-lg"
                 >
-                    <ChevronLeft className="w-5 h-5" />
                     Back
                 </button>
                 <button
                     onClick={() => onSubmit()}
                     disabled={!canSubmit || isLoading}
-                    className="flex-1 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                     {isLoading ? (
                         <>
-                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <Loader2 className="w-4 h-4 animate-spin" />
                             Saving...
                         </>
                     ) : (
                         <>
-                            <Save className="w-5 h-5" />
-                            Save Receipt
+                            <Save className="w-4 h-4" />
+                            Save
                         </>
                     )}
                 </button>
@@ -909,11 +724,6 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
 
     const handleStartEditOdometer = useCallback(() => {
         setIsEditingOdometer(true);
-    }, []);
-
-    const handleClearOdometer = useCallback(() => {
-        setOdometerPrevious('');
-        setIsEditingOdometer(false);
     }, []);
 
     const handleNextStep = useCallback(() => {
@@ -1227,7 +1037,6 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                                         onOdometerPreviousChange={setOdometerPrevious}
                                         onToggleHistory={handleToggleHistory}
                                         onStartEdit={handleStartEditOdometer}
-                                        onClearOdometer={handleClearOdometer}
                                         onMarkTouched={markTouched}
                                         onNext={handleNextStep}
                                     />
@@ -1266,7 +1075,6 @@ export function ReceiptCapture({ station, onClose }: ReceiptCaptureProps) {
                                         enableAI={enableAI}
                                         isLoading={isLoading}
                                         duplicateWarning={duplicateWarning}
-                                        stationName={station.name}
                                         onSubmittedByChange={setSubmittedBy}
                                         onEnableAIChange={() => setEnableAI(!enableAI)}
                                         onSubmit={handleSubmit}
