@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Camera, X, Loader2, CheckCircle, AlertCircle, User, ExternalLink,
     ChevronDown, Save, Sparkles, ChevronRight, ChevronLeft,
-    Calculator, Upload, Image, ScanLine
+    Calculator, Upload, Image
 } from 'lucide-react';
 import type { Station } from '../data/stations';
 import {
@@ -165,35 +165,46 @@ function Step1Content({
                     </div>
                 )}
 
-                {/* Scan Actions - User Choice */}
+                {/* AI Scan Toggle - User Choice */}
                 {scanMode === 'pending' && imageBase64 && (
-                    <div className="mt-3 p-4 bg-slate-50 border border-slate-200/60 rounded-xl">
-                        <p className="text-sm text-slate-700 mb-3">Would you like AI to scan this receipt and auto-fill the details?</p>
-                        <div className="flex gap-2">
-                            <button
-                                type="button"
-                                onClick={onStartScan}
-                                disabled={isLoading}
-                                className="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                            >
-                                <ScanLine className="w-4 h-4" />
-                                Yes, Scan Now
-                            </button>
-                            <button
-                                type="button"
-                                onClick={onSkipScan}
-                                disabled={isLoading}
-                                className="flex-1 py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 text-sm font-medium border border-slate-300 rounded-lg transition-colors"
-                            >
-                                No, Fill Manually
-                            </button>
+                    <div className="mt-3 p-4 bg-gradient-to-r from-violet-50 to-blue-50 border border-violet-200/60 rounded-xl">
+                        <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                                <p className="text-sm font-medium text-slate-800">AI Auto-Fill</p>
+                                <p className="text-xs text-slate-600 mt-1">Scan receipt to auto-fill fuel details</p>
+                            </div>
+                            <div className="flex items-center gap-2 ml-4">
+                                <button
+                                    type="button"
+                                    onClick={onSkipScan}
+                                    disabled={isLoading}
+                                    className="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors"
+                                >
+                                    Skip
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onStartScan}
+                                    disabled={isLoading}
+                                    className="relative inline-flex h-8 w-14 items-center rounded-full bg-violet-600 hover:bg-violet-700 transition-colors disabled:opacity-50"
+                                >
+                                    <span className="inline-block h-6 w-6 transform rounded-full bg-white shadow-md transition-transform translate-x-7" />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
 
                 {scanMode === 'skipped' && (
-                    <div className="mt-3 p-3 bg-slate-100 border border-slate-200/60 rounded-lg">
-                        <p className="text-sm text-slate-600">AI scan skipped. You can fill in the details manually in the next step.</p>
+                    <div className="mt-3 p-3 bg-slate-100 border border-slate-200/60 rounded-lg flex items-center justify-between">
+                        <p className="text-sm text-slate-600">AI scan skipped - you'll fill details manually</p>
+                        <button
+                            type="button"
+                            onClick={onStartScan}
+                            className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                            Change
+                        </button>
                     </div>
                 )}
 
