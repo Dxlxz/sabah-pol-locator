@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Camera, X, Loader2, CheckCircle, AlertCircle, ExternalLink,
-    ChevronRight, Save, Upload, ScanLine, Check, Fuel, Car, ClipboardCheck
+    ChevronRight, Save, Upload, ScanLine, Check, Fuel, Car
 } from 'lucide-react';
 import type { Station } from '../data/stations';
 import {
